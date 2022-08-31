@@ -61,7 +61,7 @@ async def _login_captcha_needed(client: Client, exp: LoginCaptchaNeeded):
 
 
 async def _login_device_locked(client: Client, exc: LoginDeviceLocked):
-    logger.critical("\nDevice lock detected!")
+    logger.critical("Device lock detected!")
     if not exc.sms_phone and not exc.verify_url:
         raise AssertionError("No way to verify device...")
     while True:

@@ -15,8 +15,9 @@ from avilla.core.relationship import Relationship
 from avilla.core.utilles.selector import Selector
 
 from avilla.cai.protocol import CAIProtocol
+from avilla.cai.config import CAIConfig
 
-protocol = CAIProtocol("YourAccount", "YourPassword")
+protocol = CAIProtocol(CAIConfig("YourAccount", "YourPassword"))
 broadcast = create(Broadcast)
 avilla = Avilla(broadcast, [protocol], [AiohttpClientService()])
 
