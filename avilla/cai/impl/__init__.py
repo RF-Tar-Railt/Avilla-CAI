@@ -19,7 +19,7 @@ raise_for_no_namespace()
 
 # Relationship Complete
 
-with scope("group"), prefix("group"):
+with scope("avilla-cai", "group"), prefix("group"):
     completes("member", "group.member")
 
 
