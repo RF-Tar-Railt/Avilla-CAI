@@ -1,0 +1,46 @@
+[project]
+name = "avilla-cai"
+version = "0.1.0"
+description = "impl of cai to avilla"
+authors = [
+    {name = "RF-Tar-Railt", email = "rf_tar_railt@qq.com"},
+]
+dependencies = [
+    "cai @ git+https://github.com/wyapx/CAI.git",
+    "launart>=0.6.1",
+    "graia-amnesia>=0.6.0",
+    "graia-broadcast>=0.18.2",
+    "avilla-core>=1.0.0rc4",
+    "loguru>=0.6.0",
+]
+requires-python = ">=3.8"
+readme = "README.md"
+license = {text = "AGPL-3.0"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.8",
+]
+[project.optional-dependencies]
+
+[build-system]
+requires = ["pdm-pep517>=1.0.0"]
+build-backend = "pdm.pep517.api"
+
+[tool]
+[tool.pdm]
+[tool.pdm.build]
+includes = ["avilla/cai"]
+[tool.pdm.dev-dependencies]
+dev = [
+    "Pillow>=9.2.0",
+    "arclet-alconna>=1.2.0.5",
+    "devtools>=0.9.0",
+    "creart>=0.2.2",
+    "creart-graia>=0.1.5",
+    "aiohttp>=3.8.1",
+    "richuru>=0.1.1",
+]
