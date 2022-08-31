@@ -6,13 +6,12 @@ from avilla.core.application import Avilla
 from avilla.core.platform import Abstract, Land, Platform
 from avilla.core.protocol import BaseProtocol
 from avilla.core.trait.context import wrap_namespace
-from avilla.core.utilles.selector import Selector
 
 from avilla.cai.event_parser import CAIEventParser
 from avilla.cai.message_deserializer import CAIMessageDeserializer
 from avilla.cai.message_serializer import CAIMessageSerializer
 from avilla.cai.service import CAIService
-from avilla.cai.account import CAIAccount
+from avilla.cai.config import CAIConfig
 
 
 class CAIProtocol(BaseProtocol):
@@ -45,21 +44,13 @@ class CAIProtocol(BaseProtocol):
 
     service: CAIService
 
-    def __init__(self, account: str, password: str, client_protocol: str | None = None):
-        self._account = account
-        self._password = password
-        self._protocol = client_protocol or "ANDROID_PHONE"
+    def __init__(self, *config: CAIConfig):
+        self.configs = list(set(config))
         super().__init__()
 
     def ensure(self, avilla: Avilla):
         self.avilla = avilla
-        self.service = CAIService(
-            self, Client(int(self._account), self._password, self._protocol)
-        )
+        self.service = CAIService(self)
         avilla.launch_manager.add_service(self.service)
-
-    def build_account(self) -> CAIAccount:
-        return CAIAccount(self._account, self)
-
-    def get_account(self, *args) -> CAIAccount | None:
-        return super().get_account(Selector().account(self._account))
+        for config in self.configs:
+            self.service.client_map[Client(int(config.account), config.password, config.protocol)] = config
