@@ -89,10 +89,7 @@ with scope("avilla-cai", "group"), prefix("group"):
         raise NotImplementedError
 
 
-    leave = impl(SceneTrait.leave)
-
-
-    @leave.pin("group")
+    @impl(SceneTrait.leave).pin("group")
     async def leave(rs: Relationship, target: Selector):
         raise NotImplementedError
 
@@ -102,42 +99,27 @@ with scope("avilla-cai", "group"), prefix("group"):
         raise NotImplementedError
 
 
-    pull_group = pull(Summary)
-
-
-    @pull_group.of("group")
+    @pull(Summary).of("group")
     async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
         raise NotImplementedError
 
 
-    set_group_name = impl(SummaryTrait.set_name)
-
-
-    @set_group_name.pin("group")
+    @impl(SummaryTrait.set_name).pin("group")
     async def group_set_name(rs: Relationship, target: Selector, name: str):
         raise NotImplementedError
 
 
-    pull_p_group_member = pull(Privilege)
-
-
-    @pull_p_group_member.of("group.member")
+    @pull(Privilege).of("group.member")
     async def group_get_privilege_info(rs: Relationship, target: Selector | None) -> Privilege:
         raise NotImplementedError
 
 
-    pull_p_s_group_member = pull(Privilege >> Summary)
-
-
-    @pull_p_s_group_member.of("group.member")
+    @pull(Privilege >> Summary).of("group.member")
     async def group_get_privilege_summary_info(rs: Relationship, target: Selector | None) -> Summary:
         raise NotImplementedError
 
 
-    pull_nick_group_member = pull(Nick)
-
-
-    @pull_nick_group_member.of("group.member")
+    @pull(Nick).of("group.member")
     async def get_member_nick(rs: Relationship, target: Selector | None) -> Nick:
         raise NotImplementedError
 
