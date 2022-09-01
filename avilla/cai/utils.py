@@ -27,10 +27,9 @@ async def _login_slider_need(client: Client, exc: LoginSliderNeeded):
         f"2. '{exc.verify_url.replace('ssl.captcha.qq.com', 'txhelper.glitch.me')}'"
     )
     logger.opt(colors=True).info(
-        f"<magenta>\nVerify url: </>\n<yellow>{verify}</>",
-        alt=f"[magenta]\nVerify url: [/]\n[dark_orange]{verify}[/]",
+        f"<magenta>\nVerify url: </>\n<yellow>{verify}</>\nPlease enter the ticket:",
+        alt=f"[magenta]\nVerify url: [/]\n[dark_orange]{verify}[/]\nPlease enter the ticket:",
     )
-    logger.info("\nPlease enter the ticket:")
     ticket = input().strip()
     try:
         await client.submit_slider_ticket(ticket)
@@ -66,16 +65,23 @@ async def _login_device_locked(client: Client, exc: LoginDeviceLocked):
         raise AssertionError("No way to verify device...")
     while True:
         logger.opt(colors=True).info(
-            "<cyan>\nChoose a method to verity: </>\n" +
-            f"{'<green>| enable  | </>' if exc.sms_phone else '<red>| disable | </>'}1. Send sms message to {exc.sms_phone}.\n" +
-            f"{'<green>| enable  | </>' if exc.verify_url else '<red>| disable | </>'}2. Verify device by url.",
+            (
+                "<cyan>\nChoose a method to verity: </>\n"
+                f"{'<green>| enable  | </>' if exc.sms_phone else '<red>| disable | </>'}"
+                f"1. Send sms message to {exc.sms_phone}.\n"
+                f"{'<green>| enable  | </>' if exc.verify_url else '<red>| disable | </>'}"
+                f"2. Verify device by url.\n"
+                f"<yellow>Choose: </>"
+            ),
             alt=(
                 "[cyan3]\nChoose a method to verity: [/]\n"
-                f"{'[green]| enable  | [/]' if exc.sms_phone else '[red]| disable | [/]'}1. Send sms message to {exc.sms_phone}.\n"
-                f"{'[green]| enable  | [/]' if exc.verify_url else '[red]| disable | [/]'}2. Verify device by url."
+                f"{'[green]| enable  | [/]' if exc.sms_phone else '[red]| disable | [/]'}"
+                f"1. Send sms message to {exc.sms_phone}.\n"
+                f"{'[green]| enable  | [/]' if exc.verify_url else '[red]| disable | [/]'}"
+                f"2. Verify device by url.\n"
+                f"[yellow]Choose: [/]"
             )
         )
-        logger.opt(colors=True).info("<yellow>\nChoose: </>", alt="[yellow]\nChoose: [/]")
         choice = input()
         if "1" in choice and exc.sms_phone:
             way = "sms"

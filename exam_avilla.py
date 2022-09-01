@@ -11,7 +11,6 @@ from avilla.core.elements import Picture
 from avilla.core.event.message import MessageReceived, MessageRevoked
 from avilla.core.message import Message
 from avilla.core.relationship import Relationship
-from avilla.core.resource import LocalFileResource
 from avilla.core.skeleton.message import MessageTrait
 from avilla.core.utilles.selector import DynamicSelector, Selector
 from avilla.cai.protocol import CAIProtocol
@@ -33,6 +32,7 @@ async def on_message_received(event: MessageReceived, rs: Relationship, account:
         msg = await rs.send_message("this msg will be recalled in 10s.")
         await asyncio.sleep(10)
         await rs.cast(MessageTrait).revoke(msg)
+        await rs.send_message([Picture("test.png")])
     elif Selector.fragment().as_dyn().group("*").member("3542928737").match(rs.ctx):
         print(5, account)
         print(6, rs.ctx, rs.mainline, rs.self)

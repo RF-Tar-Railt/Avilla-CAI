@@ -48,24 +48,27 @@ class CAIMessageSerializer(MessageSerializer["CAIProtocol"]):
 
     @elem_rec(Picture)
     async def image(self, protocol: "CAIProtocol", element: Picture):
-        raw = await ctx_relationship.get().fetch(element.resource)
-        mainline = ctx_relationship.get().mainline
+        rs = ctx_relationship.get()
+        raw = await rs.fetch(element.resource)
+        mainline = rs.mainline
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send image in group")
-        return await protocol.service.client.upload_image(int(gid), BytesIO(raw))
+        return await rs.account.client.upload_image(int(gid), BytesIO(raw))
 
     @elem_rec(FlashImage)
     async def flash_image(self, protocol: "CAIProtocol", element: FlashImage):
-        raw = await ctx_relationship.get().fetch(element.resource)
-        mainline = ctx_relationship.get().mainline
+        rs = ctx_relationship.get()
+        raw = await rs.fetch(element.resource)
+        mainline = rs.mainline
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send flash-image in group")
-        return (await protocol.service.client.upload_image(int(gid), BytesIO(raw))).to_flash()
+        return (await rs.account.client.upload_image(int(gid), BytesIO(raw))).to_flash()
 
     @elem_rec(Audio)
     async def voice(self, protocol: "CAIProtocol", element: Audio):
-        raw = await ctx_relationship.get().fetch(element.resource)
-        mainline = ctx_relationship.get().mainline
+        rs = ctx_relationship.get()
+        raw = await rs.fetch(element.resource)
+        mainline = rs.mainline
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send voice in group")
-        return await protocol.service.client.upload_voice(int(gid), BytesIO(raw))
+        return await rs.account.client.upload_voice(int(gid), BytesIO(raw))
