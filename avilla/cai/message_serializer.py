@@ -45,36 +45,40 @@ class CAIMessageSerializer(MessageSerializer["CAIProtocol"]):
         rs = ctx_relationship.get()
         raw = await rs.fetch(element.resource)
         mainline = rs.mainline
+        client = protocol.service.get_client(rs.account.id)
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send image in group")
-        return await rs.account.client.upload_image(int(gid), BytesIO(raw))
+        return await client.upload_image(int(gid), BytesIO(raw))
 
     @elem_rec(Flash)
     async def flash_image(self, protocol: "CAIProtocol", element: Flash):
         rs = ctx_relationship.get()
         raw = await rs.fetch(element.resource)
         mainline = rs.mainline
+        client = protocol.service.get_client(rs.account.id)
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send flash-image in group")
-        return (await rs.account.client.upload_image(int(gid), BytesIO(raw))).to_flash()
+        return (await client.upload_image(int(gid), BytesIO(raw))).to_flash()
 
     @elem_rec(Audio)
     async def voice(self, protocol: "CAIProtocol", element: Audio):
         rs = ctx_relationship.get()
         raw = await rs.fetch(element.resource)
         mainline = rs.mainline
+        client = protocol.service.get_client(rs.account.id)
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send voice in group")
-        return await rs.account.client.upload_voice(int(gid), BytesIO(raw))
+        return await client.upload_voice(int(gid), BytesIO(raw))
 
     @elem_rec(Video)
     async def voice(self, protocol: "CAIProtocol", element: Video):
         rs = ctx_relationship.get()
         raw = await rs.fetch(element.resource)
         mainline = rs.mainline
+        client = protocol.service.get_client(rs.account.id)
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send voice in group")
-        return await rs.account.client.upload_video(int(gid), BytesIO(raw), BytesIO(raw))
+        return await client.upload_video(int(gid), BytesIO(raw), BytesIO(raw))
 
     @elem_rec(Shake)
     def shake(self, protocol: "CAIProtocol", element: Shake):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 from cai.client.models import Friend
+from graia.amnesia.message import MessageChain
 
 from avilla.core.cell.cells import Nick, Summary
 from avilla.core.skeleton.message import MessageTrait
@@ -9,8 +10,10 @@ from avilla.core.trait.context import prefix, raise_for_no_namespace, scope
 from avilla.core.trait.recorder import default_target, impl, pull, query
 from avilla.core.utilles.selector import Selector
 
+from avilla.cai.account import CAIAccount
+
 if TYPE_CHECKING:
-    from graia.amnesia.message import MessageChain
+
     from avilla.core.relationship import Relationship
 
 
@@ -26,6 +29,7 @@ with scope("avilla-cai", "friend"), prefix("friend"):
     async def send_friend_message(
         rs: Relationship, target: Selector, message: MessageChain, *, reply: Selector | None = None
     ) -> Selector:
+        assert isinstance(rs.account, CAIAccount)
         serialized_msg = await rs.protocol.serialize_message(message)
         result = await rs.account.client.send_friend_msg(
             int(target.pattern["friend"]), serialized_msg
@@ -35,6 +39,7 @@ with scope("avilla-cai", "friend"), prefix("friend"):
 
     @impl(MessageTrait.revoke)
     async def revoke_friend_message(rs: Relationship, message: Selector):
+        assert isinstance(rs.account, CAIAccount)
         await rs.account.client.recall_friend_msg(
             int(message.pattern["friend"]),
             (
@@ -47,6 +52,7 @@ with scope("avilla-cai", "friend"), prefix("friend"):
     @pull(Nick).of("friend")
     async def get_friend_nick(rs: Relationship, target: Selector | None) -> Nick:
         assert target is not None
+        assert isinstance(rs.account, CAIAccount)
         friend = await rs.account.client.get_friend(int(target.pattern['friend']))
         assert isinstance(friend, Friend)
         return Nick(Nick, friend.nick, friend.remark, '')
@@ -55,13 +61,15 @@ with scope("avilla-cai", "friend"), prefix("friend"):
     @pull(Summary).of("friend")
     async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
         assert target is not None
+        assert isinstance(rs.account, CAIAccount)
         friend = await rs.account.client.get_friend(int(target.pattern['friend']))
         assert isinstance(friend, Friend)
         return Summary(describe=Summary, name=friend.nick, description=friend.term_description)
 
     @query(None, "friend")
     async def get_friends(rs: Relationship, upper: None, predicate: Selector):
-        result: list[Friend] = rs.account.client.get_friend_list()
+        assert isinstance(rs.account, CAIAccount)
+        result: list[Friend] = await rs.account.client.get_friend_list()
         for i in result:
             friend = Selector().friend(str(i.uin))
             if predicate.match(friend):

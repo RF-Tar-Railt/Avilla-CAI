@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import timedelta
 from typing import TYPE_CHECKING
+from graia.amnesia.message import MessageChain
 from cai.client.models import Group, GroupMember
 
 from avilla.core.cell.cells import Nick, Privilege, Summary
@@ -15,9 +16,9 @@ from avilla.core.trait.context import prefix, raise_for_no_namespace, scope
 from avilla.core.trait.recorder import default_target, impl, pull, query
 from avilla.core.utilles.selector import Selector
 
-if TYPE_CHECKING:
-    from graia.amnesia.message import MessageChain
+from avilla.cai.account import CAIAccount
 
+if TYPE_CHECKING:
     from avilla.core.relationship import Relationship
 
 raise_for_no_namespace()
@@ -33,6 +34,7 @@ with scope("avilla-cai", "group"), prefix("group"):
             rs: Relationship, target: Selector, message: MessageChain, *, reply: Selector | None = None
     ) -> Selector:
         serialized_msg = await rs.protocol.serialize_message(message)
+        assert isinstance(rs.account, CAIAccount)
         result = await rs.account.client.send_group_msg(
             int(target.pattern["group"]),
             serialized_msg
@@ -43,6 +45,7 @@ with scope("avilla-cai", "group"), prefix("group"):
 
     @impl(MessageTrait.revoke)
     async def revoke_group_message(rs: Relationship, message: Selector):
+        assert isinstance(rs.account, CAIAccount)
         await rs.account.client.recall_group_msg(
             int(message.pattern["group"]),
             (
@@ -66,6 +69,7 @@ with scope("avilla-cai", "group"), prefix("group"):
         time = max(0, min(int(duration.total_seconds()), 2592000))  # Fix time parameter
         if not time:
             return
+        assert isinstance(rs.account, CAIAccount)
         await rs.account.client.mute_member(
             int(target.pattern["group"]),
             int(target.pattern["member"]),
@@ -101,12 +105,14 @@ with scope("avilla-cai", "group"), prefix("group"):
     @pull(Summary).of("group")
     async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
         assert target is not None
+        assert isinstance(rs.account, CAIAccount)
         group = await rs.account.client.get_group(int(target.pattern["group"]))
         assert isinstance(group, Group)
         return Summary(describe=Summary, name=group.group_name, description=group.group_memo)
 
     @pull(Summary).of("group.member")
     async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
+        assert isinstance(rs.account, CAIAccount)
         result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
         try:
             self = next(filter(lambda x: x.uin == int(rs.account.id), result))
@@ -135,6 +141,7 @@ with scope("avilla-cai", "group"), prefix("group"):
 
     @pull(Privilege).of("group.member")
     async def group_get_privilege_info(rs: Relationship, target: Selector | None) -> Privilege:
+        assert isinstance(rs.account, CAIAccount)
         result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
         try:
             self = next(filter(lambda x: x.uin == int(rs.account.id), result))
@@ -163,6 +170,7 @@ with scope("avilla-cai", "group"), prefix("group"):
 
     @pull(Privilege >> Summary).of("group.member")
     async def group_get_privilege_summary_info(rs: Relationship, target: Selector | None) -> Summary:
+        assert isinstance(rs.account, CAIAccount)
         privilege_trans = defaultdict(lambda: "group_member", {"owner": "group_owner", "admin": "group_admin"})
         result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
         try:
@@ -186,9 +194,9 @@ with scope("avilla-cai", "group"), prefix("group"):
         )
 
 
-    @impl(PrivilegeTrait.upgrade)
+    @impl(PrivilegeTrait.upgrade).pin("group.member")
     async def group_set_admin(rs: Relationship, target: Selector, dest: str | None):
-        assert target.follows("group.member")
+        assert isinstance(rs.account, CAIAccount)
         await rs.account.client.set_group_admin(
             int(target.pattern['group']),
             int(target.pattern['member']),
@@ -196,9 +204,9 @@ with scope("avilla-cai", "group"), prefix("group"):
         )
 
 
-    @impl(PrivilegeTrait.downgrade)
+    @impl(PrivilegeTrait.downgrade).pin("group.member")
     async def group_set_admin(rs: Relationship, target: Selector, dest: str | None):
-        assert target.follows("group.member")
+        assert isinstance(rs.account, CAIAccount)
         await rs.account.client.set_group_admin(
             int(target.pattern['group']),
             int(target.pattern['member']),
@@ -209,6 +217,7 @@ with scope("avilla-cai", "group"), prefix("group"):
     @pull(Nick).of("group.member")
     async def get_member_nick(rs: Relationship, target: Selector | None) -> Nick:
         assert target is not None
+        assert isinstance(rs.account, CAIAccount)
         result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
         try:
             member = next(filter(lambda x: x.uin == int(target.pattern["member"]), result))
@@ -219,7 +228,8 @@ with scope("avilla-cai", "group"), prefix("group"):
 
     @query(None, "group")
     async def get_groups(rs: Relationship, upper: None, predicate: Selector):
-        result: list[Group] = rs.account.client.get_group_list()
+        assert isinstance(rs.account, CAIAccount)
+        result: list[Group] = await rs.account.client.get_group_list()
         for i in result:
             group = Selector().group(str(i.group_id))
             if predicate.match(group):
@@ -228,6 +238,7 @@ with scope("avilla-cai", "group"), prefix("group"):
 
     @query("group", "member")
     async def get_group_members(rs: Relationship, upper: Selector, predicate: Selector):
+        assert isinstance(rs.account, CAIAccount)
         result: list[GroupMember] = await rs.account.client.get_group_member_list(int(upper.pattern["group"]))
         for i in result:
             member = Selector().group(str(i.group.group_id)).member(str(i.member_uin))
