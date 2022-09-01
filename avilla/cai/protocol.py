@@ -5,6 +5,7 @@ from cai import Client
 from loguru import logger
 from avilla.core.event import AvillaEvent
 from avilla.core.event.message import MessageReceived
+from avilla.core.event.lifecycle import AccountStatusChanged
 from avilla.core.application import Avilla
 from avilla.core.platform import Abstract, Land, Platform
 from avilla.core.protocol import BaseProtocol
@@ -63,8 +64,8 @@ class CAIProtocol(BaseProtocol):
 
     @staticmethod
     async def record_event(event: AvillaEvent):
-        rs = await event.account.get_relationship(event.ctx)
         if isinstance(event, MessageReceived):
+            rs = await event.account.get_relationship(event.ctx)
             if (
                 event.ctx.pattern[event.ctx.latest_key] == event.account.id
                 and event.ctx.pattern.get("land") == event.account.land.name
@@ -95,7 +96,7 @@ class CAIProtocol(BaseProtocol):
                     f"{event.account.land.name} >> [recv]{out}"
                     f" -> {str(event.message.content)!r}"
                 )
-        else:
+        elif not isinstance(event, AccountStatusChanged):
             logger.info(
                 f"{event.account.land.name} >> {event.__class__.__name__} from "
                 f"{'.'.join(f'{k}({v})' for k, v in event.ctx.pattern.items() if k != 'land')}"
