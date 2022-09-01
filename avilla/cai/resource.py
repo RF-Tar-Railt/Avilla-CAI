@@ -6,19 +6,16 @@ from avilla.core.utilles.selector import Selector
 
 class CAIResource(Resource[bytes]):
     url: str | None = None
-    path: str | None = None
     mainline: Selector | None = None
 
     def __init__(
         self,
         id: str,
         url: str | None = None,
-        path: str | None = None,
         mainline: Selector | None = None,
     ) -> None:
         self.id = id
         self.url = url
-        self.path = path
         self.mainline = mainline
 
     @property
@@ -43,13 +40,41 @@ class CAIAudioResource(CAIResource):
         self,
         id: str,
         url: str | None = None,
-        path: str | None = None,
         mainline: Selector | None = None,
         length: int | None = None,
     ) -> None:
-        super().__init__(id, url, path, mainline)
+        super().__init__(id, url, mainline)
         self.length = length
 
     @property
     def type(self) -> str:
         return "audio"
+
+
+class CAIVideoResource(CAIResource):
+    md5: bytes | None = None
+    size: int | None = None
+    length: int | None = None
+    thumb_size: int | None = None,
+    thumb_md5: bytes | None = None
+
+    def __init__(
+            self,
+            id: str,
+            md5: bytes | None = None,
+            size: int | None = None,
+            length: int | None = None,
+            thumb_size: int | None = None,
+            thumb_md5: bytes | None = None,
+            mainline: Selector | None = None,
+    ) -> None:
+        super().__init__(id, mainline=mainline)
+        self.md5 = md5
+        self.size = size
+        self.length = length
+        self.thumb_size = thumb_size
+        self.thumb_md5 = thumb_md5
+
+    @property
+    def type(self) -> str:
+        return "video"
