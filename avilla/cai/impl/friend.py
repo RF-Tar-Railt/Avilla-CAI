@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from cai.client.models import Friend
 
-from avilla.core.message import Message
+from avilla.core.cell.cells import Nick, Summary
 from avilla.core.skeleton.message import MessageTrait
 from avilla.core.trait.context import prefix, raise_for_no_namespace, scope
-from avilla.core.trait.recorder import default_target, impl, pull
+from avilla.core.trait.recorder import default_target, impl, pull, query
 from avilla.core.utilles.selector import Selector
 
 if TYPE_CHECKING:
     from graia.amnesia.message import MessageChain
-
     from avilla.core.relationship import Relationship
 
 
@@ -43,3 +43,26 @@ with scope("avilla-cai", "friend"), prefix("friend"):
                 int(message.pattern["time"])
             )
         )
+
+    @pull(Nick).of("friend")
+    async def get_friend_nick(rs: Relationship, target: Selector | None) -> Nick:
+        assert target is not None
+        friend = await rs.account.client.get_friend(int(target.pattern['friend']))
+        assert isinstance(friend, Friend)
+        return Nick(Nick, friend.nick, friend.remark, '')
+
+
+    @pull(Summary).of("friend")
+    async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
+        assert target is not None
+        friend = await rs.account.client.get_friend(int(target.pattern['friend']))
+        assert isinstance(friend, Friend)
+        return Summary(describe=Summary, name=friend.nick, description=friend.term_description)
+
+    @query(None, "friend")
+    async def get_friends(rs: Relationship, upper: None, predicate: Selector):
+        result: list[Friend] = rs.account.client.get_friend_list()
+        for i in result:
+            friend = Selector().friend(str(i.uin))
+            if predicate.match(friend):
+                yield friend

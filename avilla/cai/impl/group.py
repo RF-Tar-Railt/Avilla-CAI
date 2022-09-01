@@ -7,7 +7,6 @@ from cai.client.models import Group, GroupMember
 
 from avilla.core.cell.cells import Nick, Privilege, Summary
 from avilla.core.exceptions import permission_error_message
-from avilla.core.message import Message
 from avilla.core.skeleton.message import MessageTrait
 from avilla.core.skeleton.privilege import MuteTrait, PrivilegeTrait
 from avilla.core.skeleton.scene import SceneTrait
@@ -116,7 +115,7 @@ with scope("avilla-cai", "group"), prefix("group"):
         if not target:
             return Summary(
                 Summary,
-                self.name,
+                self.member_card,
                 self.memo
             )
         try:

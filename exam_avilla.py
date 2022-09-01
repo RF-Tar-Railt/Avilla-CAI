@@ -12,9 +12,10 @@ from avilla.core.elements import Picture, Notice
 from avilla.core.event.message import MessageReceived, MessageRevoked
 from avilla.core.relationship import Relationship
 from avilla.core.skeleton.message import MessageTrait
-from avilla.core.utilles.selector import Selector
+
 from avilla.cai.protocol import CAIProtocol
 from avilla.cai.config import CAIConfig
+from avilla.cai.element import Custom
 
 protocol = CAIProtocol(
     CAIConfig(
@@ -59,6 +60,7 @@ async def on_message_revoked(event: MessageRevoked, rs: Relationship, account: A
     print("[mainline]", rs.mainline)
     print("[operator]", event.operator)
     print("[message]", event.message)
+    await rs.send_message([Custom(b'Hey! I\'m a human!')])
 
 
 @broadcast.receiver(MessageReceived)
