@@ -5,11 +5,12 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Callable, Coroutine, Any
 from graia.amnesia.message import MessageChain
 from cai.client import Event
+from cai.client.events.group import GroupMessageRecalledEvent
 from cai.client.events.common import GroupMessage, PrivateMessage, TempMessage
 from cai.client.message_service.models import ReplyElement
 from loguru import logger
 
-from avilla.core.event.message import MessageReceived
+from avilla.core.event.message import MessageReceived, MessageRevoked
 from avilla.core.message import Message
 from avilla.core.utilles.event_parser import AbstractEventParser, event
 from avilla.core.utilles.selector import Selector
@@ -83,7 +84,7 @@ class CAIEventParser(AbstractEventParser["CAIProtocol"]):
         )
 
     @event("private_message")
-    async def friend_message(self, protocol: CAIProtocol, account: CAIAccount, raw: PrivateMessage):
+    async def private_message(self, protocol: CAIProtocol, account: CAIAccount, raw: PrivateMessage):
         message_chain = raw.message
         source = _Source(raw.seq, raw.time)
         quote = None
@@ -140,4 +141,21 @@ class CAIEventParser(AbstractEventParser["CAIProtocol"]):
                 else None,
             ),
             account=account,
+        )
+
+    @event("GroupMessageRecalledEvent")
+    async def group_message_recall(self, protocol: CAIProtocol, account: CAIAccount, raw: GroupMessageRecalledEvent):
+        return MessageRevoked(
+            message=Selector()
+            .land(protocol.land)
+            .group(str(raw.group_id))
+            .message(str(raw.msg_seq))
+            .random(str(raw.msg_random))
+            .time(str(raw.msg_time)),
+            operator=Selector()
+            .land(protocol.land)
+            .group(str(raw.group_id))
+            .member(str(raw.operator_id)),
+            account=account,
+            time=datetime.fromtimestamp(raw.msg_time)
         )

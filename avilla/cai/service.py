@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import asyncio
 from typing import TYPE_CHECKING, Set, Literal, Dict
 from cai import Client
@@ -32,9 +31,9 @@ class CAIService(Service):
         return any(account_id == str(config.account) for config in self.client_map.values())
 
     def get_client(self, account_id: str):
-        for config in self.client_map.values():
+        for client, config in self.client_map.items():
             if str(config.account) == account_id:
-                return config
+                return client
         raise ValueError(f"Account {account_id} not found")
 
     async def _cai_event_hook(self, _: Client, event: Event):
@@ -62,7 +61,11 @@ class CAIService(Service):
             for client, config in self.client_map.items():
                 logger.debug(f"wait login for {config.account}")
                 try:
-                    await client.login()
+                    if config.cache_siginfo and config.cache_path.exists():
+                        logger.debug(f"using account {config.account}'s sig info...")
+                        await client.token_login(config.cache_path.open("rb").read())
+                    else:
+                        await client.login()
                 except Exception as e:
                     await login_resolver(client, e)
                 self.protocol.avilla.add_account(CAIAccount(str(config.account), self.protocol))
@@ -79,5 +82,12 @@ class CAIService(Service):
                     return_when=asyncio.FIRST_COMPLETED,
                 )
         async with self.stage("cleanup"):
-            for client in self.client_map.keys():
+            for client, config in self.client_map.items():
                 await client.close()
+                if config.cache_siginfo:
+                    data = client.dump_sig()
+                    config.cache_path.parent.mkdir(exist_ok=True)
+                    with config.cache_path.open("wb+") as f:
+                        f.write(data)
+                    logger.debug(f"account {config.account}'s sig info saved.")
+
