@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from cai import Client
 from loguru import logger
 from avilla.core.event import AvillaEvent
@@ -8,6 +9,7 @@ from avilla.core.application import Avilla
 from avilla.core.platform import Abstract, Land, Platform
 from avilla.core.protocol import BaseProtocol
 from avilla.core.trait.context import wrap_namespace
+from avilla.core.cell.cells import Summary
 
 from avilla.cai.event_parser import CAIEventParser
 from avilla.cai.message_deserializer import CAIMessageDeserializer
@@ -40,9 +42,9 @@ class CAIProtocol(BaseProtocol):
     """
 
     with wrap_namespace() as impl_namespace:
-        import avilla.cai.impl as _
-        import avilla.cai.impl.group as _
-        import avilla.cai.impl.friend as _
+        import avilla.cai.impl as _  # noqa
+        import avilla.cai.impl.group as _  # noqa
+        import avilla.cai.impl.friend as _  # noqa
 
     service: CAIService
 
@@ -55,28 +57,46 @@ class CAIProtocol(BaseProtocol):
         self.service = CAIService(self)
         avilla.launch_manager.add_service(self.service)
         for config in self.configs:
-            self.service.client_map[Client(int(config.account), config.password, config.protocol)] = config
+            self.service.client_map[
+                Client(int(config.account), config.password, config.protocol)
+            ] = config
 
     @staticmethod
-    def record_event(event: AvillaEvent):
+    async def record_event(event: AvillaEvent):
+        rs = await event.account.get_relationship(event.ctx)
         if isinstance(event, MessageReceived):
             if (
-                    event.ctx.pattern[event.ctx.latest_key] == event.account.id and
-                    event.ctx.pattern.get('land') == event.account.land.name
+                event.ctx.pattern[event.ctx.latest_key] == event.account.id
+                and event.ctx.pattern.get("land") == event.account.land.name
             ):
+                name = ""
+                with suppress(NotImplementedError):
+                    name = (await rs.pull(Summary, event.message.mainline)).name
+                mainline = event.message.mainline.pattern[event.message.mainline.latest_key]
                 logger.info(
-                    f"[{event.account.land.name}]"
-                    f"[SEND] {'.'.join(f'{k}({v})' for k, v in event.message.mainline.pattern.items() if k != 'land')}"
+                    f"{event.account.land.name} >> [send]"
+                    f"[{event.message.mainline.latest_key}({f'{name}, ' if name else ''}{mainline})]"
                     f" <- {str(event.message.content)!r}"
                 )
             else:
+                main_name = ""
+                with suppress(NotImplementedError):
+                    main_name = (await rs.pull(Summary, event.message.mainline)).name
+                mainline = event.message.mainline.pattern[event.message.mainline.latest_key]
+                ctx_name = ""
+                with suppress(NotImplementedError):
+                    ctx_name = (await rs.pull(Summary, event.message.sender)).name
+                ctx = event.ctx.pattern[event.ctx.latest_key]
+                out = f"[{event.message.mainline.latest_key}({f'{main_name}, ' if main_name else ''}{mainline})]"
+                if ctx != mainline:
+                    out += f" {ctx_name or event.ctx.latest_key}({ctx})"
+
                 logger.info(
-                    f"[{event.account.land.name}]"
-                    f"[RECV] {'.'.join(f'{k}({v})' for k, v in event.ctx.pattern.items() if k != 'land')}"
+                    f"{event.account.land.name} >> [recv]{out}"
                     f" -> {str(event.message.content)!r}"
                 )
         else:
             logger.info(
-                f"[{event.account.land.name}] {event.__class__.__name__} from "
+                f"{event.account.land.name} >> {event.__class__.__name__} from "
                 f"{'.'.join(f'{k}({v})' for k, v in event.ctx.pattern.items() if k != 'land')}"
             )

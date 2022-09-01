@@ -101,8 +101,33 @@ with scope("avilla-cai", "group"), prefix("group"):
 
     @pull(Summary).of("group")
     async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
-        raise NotImplementedError
+        assert target is not None
+        group = await rs.account.client.get_group(int(target.pattern["group"]))
+        assert isinstance(group, Group)
+        return Summary(describe=Summary, name=group.group_name, description=group.group_memo)
 
+    @pull(Summary).of("group.member")
+    async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
+        result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
+        try:
+            self = next(filter(lambda x: x.uin == int(rs.account.id), result))
+        except StopIteration as e:
+            raise RuntimeError from e
+        if not target:
+            return Summary(
+                Summary,
+                self.name,
+                self.memo
+            )
+        try:
+            member = next(filter(lambda x: x.uin == int(target.pattern["member"]), result))
+        except StopIteration as e:
+            raise RuntimeError from e
+        return Summary(
+                Summary,
+                member.member_card,
+                member.memo
+            )
 
     @impl(SummaryTrait.set_name).pin("group")
     async def group_set_name(rs: Relationship, target: Selector, name: str):
@@ -111,17 +136,86 @@ with scope("avilla-cai", "group"), prefix("group"):
 
     @pull(Privilege).of("group.member")
     async def group_get_privilege_info(rs: Relationship, target: Selector | None) -> Privilege:
-        raise NotImplementedError
+        result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
+        try:
+            self = next(filter(lambda x: x.uin == int(rs.account.id), result))
+        except StopIteration as e:
+            raise RuntimeError from e
+        if not target:
+            return Privilege(
+                Privilege,
+                self.role.value in {"owner", "admin"},
+                self.role.value in {"owner", "admin"},
+            )
+        try:
+            member = next(filter(lambda x: x.uin == int(target.pattern["member"]), result))
+        except StopIteration as e:
+            raise RuntimeError from e
+        return Privilege(
+            Privilege,
+            self.role.value in {"owner", "admin"},
+            (self.role.value == "owner" and member.role.value != "owner")
+            or (
+                    self.role.value in {"owner", "admin"}
+                    and member.role.value not in {"owner", "admin"}
+            ),
+        )
 
 
     @pull(Privilege >> Summary).of("group.member")
     async def group_get_privilege_summary_info(rs: Relationship, target: Selector | None) -> Summary:
-        raise NotImplementedError
+        privilege_trans = defaultdict(lambda: "group_member", {"owner": "group_owner", "admin": "group_admin"})
+        result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
+        try:
+            self = next(filter(lambda x: x.uin == int(rs.account.id), result))
+        except StopIteration as e:
+            raise RuntimeError from e
+        if not target:
+            return Summary(
+                Privilege >> Summary,
+                privilege_trans[self.role.value],
+                "the permission info of current account in the group",
+            )
+        try:
+            member = next(filter(lambda x: x.uin == int(target.pattern["member"]), result))
+        except StopIteration as e:
+            raise RuntimeError from e
+        return Summary(
+            Privilege >> Summary,
+            privilege_trans[member.role.value],
+            "the permission info of current account in the group",
+        )
+
+
+    @impl(PrivilegeTrait.upgrade)
+    async def group_set_admin(rs: Relationship, target: Selector, dest: str | None):
+        assert target.follows("group.member")
+        await rs.account.client.set_group_admin(
+            int(target.pattern['group']),
+            int(target.pattern['member']),
+            is_admin=True
+        )
+
+
+    @impl(PrivilegeTrait.downgrade)
+    async def group_set_admin(rs: Relationship, target: Selector, dest: str | None):
+        assert target.follows("group.member")
+        await rs.account.client.set_group_admin(
+            int(target.pattern['group']),
+            int(target.pattern['member']),
+            is_admin=False
+        )
 
 
     @pull(Nick).of("group.member")
     async def get_member_nick(rs: Relationship, target: Selector | None) -> Nick:
-        raise NotImplementedError
+        assert target is not None
+        result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
+        try:
+            member = next(filter(lambda x: x.uin == int(target.pattern["member"]), result))
+        except StopIteration as e:
+            raise RuntimeError from e
+        return Nick(Nick, member.name or member.nick, member.member_card, member.special_title)
 
 
     @query(None, "group")

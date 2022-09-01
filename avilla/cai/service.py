@@ -43,7 +43,7 @@ class CAIService(Service):
             ), event
         )
         if event:
-            self.protocol.record_event(event)
+            await self.protocol.record_event(event)
             self.protocol.post_event(event)
 
     def get_interface(self, interface_type):
