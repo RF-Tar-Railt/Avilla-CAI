@@ -60,10 +60,13 @@ class CAIService(Service):
     async def launch(self, manager: Launart):
         async with self.stage("preparing"):
             for client, config in self.client_map.items():
-                logger.debug(f"wait login for {config.account}")
+                logger.opt(colors=True).info(
+                    f"waiting for <magenta>{config.account}</> login...",
+                    alt=f"waiting for [magenta]{config.account}[/] login...",
+                )
                 try:
                     if config.cache_siginfo and config.cache_path.exists():
-                        logger.debug(f"using account {config.account}'s sig info...")
+                        logger.debug(f"using account {config.account}'s siginfo")
                         await client.token_login(config.cache_path.open("rb").read())
                     else:
                         await client.login()
@@ -87,8 +90,8 @@ class CAIService(Service):
                 await client.close()
                 if config.cache_siginfo:
                     data = client.dump_sig()
-                    config.cache_path.parent.mkdir(exist_ok=True)
+                    config.cache_path.parent.mkdir(parents=True, exist_ok=True)
                     with config.cache_path.open("wb+") as f:
                         f.write(data)
-                    logger.debug(f"account {config.account}'s sig info saved.")
+                    logger.success(f"account {config.account}'s siginfo saved.")
 

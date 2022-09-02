@@ -58,6 +58,7 @@ class CAIProtocol(BaseProtocol):
         self.service = CAIService(self)
         avilla.launch_manager.add_service(self.service)
         for config in self.configs:
+            config.init_dir()
             self.service.client_map[
                 Client(int(config.account), config.password, config.protocol)
             ] = config
@@ -75,8 +76,8 @@ class CAIProtocol(BaseProtocol):
                     name = (await rs.pull(Summary, event.message.mainline)).name
                 mainline = event.message.mainline.pattern[event.message.mainline.latest_key]
                 logger.info(
-                    f"{event.account.land.name} >> [send]"
-                    f"[{event.message.mainline.latest_key}({f'{name}, ' if name else ''}{mainline})]"
+                    f"{event.account.land.name}: [send]"
+                    f"[{event.message.mainline.latest_key.title()}({f'{name}, ' if name else ''}{mainline})]"
                     f" <- {str(event.message.content)!r}"
                 )
             else:
@@ -88,16 +89,16 @@ class CAIProtocol(BaseProtocol):
                 with suppress(NotImplementedError):
                     ctx_name = (await rs.pull(Summary, event.message.sender)).name
                 ctx = event.ctx.pattern[event.ctx.latest_key]
-                out = f"[{event.message.mainline.latest_key}({f'{main_name}, ' if main_name else ''}{mainline})]"
+                out = f"[{event.message.mainline.latest_key.title()}({f'{main_name}, ' if main_name else ''}{mainline})]"
                 if ctx != mainline:
-                    out += f" {ctx_name or event.ctx.latest_key}({ctx})"
+                    out += f" {ctx_name or event.ctx.latest_key.title()}({ctx})"
 
                 logger.info(
-                    f"{event.account.land.name} >> [recv]{out}"
+                    f"{event.account.land.name}: [recv]{out}"
                     f" -> {str(event.message.content)!r}"
                 )
         elif not isinstance(event, AccountStatusChanged):
             logger.info(
-                f"{event.account.land.name} >> {event.__class__.__name__} from "
+                f"{event.account.land.name}: {event.__class__.__name__} from "
                 f"{'.'.join(f'{k}({v})' for k, v in event.ctx.pattern.items() if k != 'land')}"
             )

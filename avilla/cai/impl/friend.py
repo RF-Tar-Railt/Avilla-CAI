@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+
+from loguru import logger
 from typing import TYPE_CHECKING
+from contextlib import suppress
 from cai.client.models import Friend
 from graia.amnesia.message import MessageChain
-
 from avilla.core.cell.cells import Nick, Summary
 from avilla.core.skeleton.message import MessageTrait
 from avilla.core.trait.context import prefix, raise_for_no_namespace, scope
@@ -27,15 +29,33 @@ with scope("avilla-cai", "friend"), prefix("friend"):
 
     @impl(MessageTrait.send)
     async def send_friend_message(
-        rs: Relationship, target: Selector, message: MessageChain, *, reply: Selector | None = None
+        rs: Relationship,
+        target: Selector,
+        message: MessageChain,
+        *,
+        reply: Selector | None = None,
     ) -> Selector:
         assert isinstance(rs.account, CAIAccount)
         serialized_msg = await rs.protocol.serialize_message(message)
         result = await rs.account.client.send_friend_msg(
             int(target.pattern["friend"]), serialized_msg
         )
-        return Selector().land(rs.land).group(target.pattern["friend"]).message(str(result[0])).random(
-            str(result[1])).time(str(result[2]))
+        name = ""
+        with suppress(NotImplementedError):
+            name = (await rs.pull(Summary, target)).name
+        logger.info(  # TODO: wait for solution of ActiveMessage
+            f"{rs.account.land.name}: [send]"
+            f"[Friend({f'{name}, ' if name else ''}{target.pattern['friend']})]"
+            f" <- {str(message)!r}"
+        )
+        return (
+            Selector()
+            .land(rs.land)
+            .friend(target.pattern["friend"])
+            .message(str(result[0]))
+            .random(str(result[1]))
+            .time(str(result[2]))
+        )
 
     @impl(MessageTrait.revoke)
     async def revoke_friend_message(rs: Relationship, message: Selector):
@@ -45,26 +65,27 @@ with scope("avilla-cai", "friend"), prefix("friend"):
             (
                 int(message.pattern["message"]),
                 int(message.pattern["random"]),
-                int(message.pattern["time"])
-            )
+                int(message.pattern["time"]),
+            ),
         )
 
     @pull(Nick).of("friend")
     async def get_friend_nick(rs: Relationship, target: Selector | None) -> Nick:
         assert target is not None
         assert isinstance(rs.account, CAIAccount)
-        friend = await rs.account.client.get_friend(int(target.pattern['friend']))
+        friend = await rs.account.client.get_friend(int(target.pattern["friend"]))
         assert isinstance(friend, Friend)
-        return Nick(Nick, friend.nick, friend.remark, '')
-
+        return Nick(Nick, friend.nick, friend.remark, "")
 
     @pull(Summary).of("friend")
     async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
         assert target is not None
         assert isinstance(rs.account, CAIAccount)
-        friend = await rs.account.client.get_friend(int(target.pattern['friend']))
+        friend = await rs.account.client.get_friend(int(target.pattern["friend"]))
         assert isinstance(friend, Friend)
-        return Summary(describe=Summary, name=friend.nick, description=friend.term_description)
+        return Summary(
+            describe=Summary, name=friend.nick, description=friend.term_description
+        )
 
     @query(None, "friend")
     async def get_friends(rs: Relationship, upper: None, predicate: Selector):

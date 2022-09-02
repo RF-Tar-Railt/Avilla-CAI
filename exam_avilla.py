@@ -18,10 +18,7 @@ from avilla.cai.config import CAIConfig
 from avilla.cai.element import Custom
 
 protocol = CAIProtocol(
-    CAIConfig(
-        os.getenv("CAI_ACCOUNT", ""),
-        os.getenv("CAI_PASSWORD", "")
-    )
+    CAIConfig(os.getenv("CAI_ACCOUNT", ""), os.getenv("CAI_PASSWORD", ""))
 )
 broadcast = create(Broadcast)
 avilla = Avilla(broadcast, [protocol], [AiohttpClientService()])
@@ -29,26 +26,29 @@ alc = Alconna(
     "test",
     headers=[Notice],
     main_args=Args["content", Notice, ArgField(completion=lambda: "test completion")],
-    meta=CommandMeta("测试命令1")
+    meta=CommandMeta("测试命令1"),
 )
 alc1 = Alconna(
     "test1",
-    options=[
-        Option("--say", Args["content", str]),
-        Option("--sad")
-    ],
-    meta=CommandMeta("测试命令2")
+    options=[Option("--say", Args["content", str]), Option("--sad")],
+    meta=CommandMeta("测试命令2"),
 )
 
 
 @broadcast.receiver(MessageReceived)
-async def on_message_received(event: MessageReceived, rs: Relationship, account: AbstractAccount):
-    if rs.ctx.follows("friend(3165388245)") and event.message.content.startswith("hello"):
+async def on_message_received(
+    event: MessageReceived, rs: Relationship, account: AbstractAccount
+):
+    if rs.ctx.follows("friend(3165388245)") and event.message.content.startswith(
+        "hello"
+    ):
         print(1, account)
         print(2, rs.ctx, rs.mainline, rs.self)
         print(3, event, event.message.content)
         print(4, await rs.send_message("Hello, Avilla!"))
-    if rs.ctx.follows("group.member(3165388245)") and event.message.content.startswith("hello"):
+    elif rs.ctx.follows(
+        "group.member(3165388245)"
+    ) and event.message.content.startswith("hello"):
         msg = await rs.send_message("this msg will be recalled in 10s.")
         await asyncio.sleep(10)
         await rs.cast(MessageTrait).revoke(msg)
@@ -56,11 +56,13 @@ async def on_message_received(event: MessageReceived, rs: Relationship, account:
 
 
 @broadcast.receiver(MessageRevoked)
-async def on_message_revoked(event: MessageRevoked, rs: Relationship, account: AbstractAccount):
+async def on_message_revoked(
+    event: MessageRevoked, rs: Relationship, account: AbstractAccount
+):
     print("[mainline]", rs.mainline)
     print("[operator]", event.operator)
     print("[message]", event.message)
-    await rs.send_message([Custom(b'Hey! I\'m a human!')])
+    await rs.send_message([Custom(b"Hey! I'm a human!")])
 
 
 @broadcast.receiver(MessageReceived)
@@ -70,5 +72,6 @@ async def test_(rs: Relationship, event: MessageReceived):
             await rs.send_message(f"{res.source.get_help()}")
         elif (res := alc1.parse(event.message.content)).matched:
             await rs.send_message(f"{res.source.get_help()}")
+
 
 avilla.launch_manager.launch_blocking(loop=broadcast.loop)
