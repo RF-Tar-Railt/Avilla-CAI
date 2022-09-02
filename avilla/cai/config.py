@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from cai.storage import change_config_dir, change_cache_dir
+from cai.storage import change_config_dir, change_cache_dir, Storage
 from typing import Literal, Union, Optional
 from pathlib import Path
 
@@ -21,4 +21,4 @@ class CAIConfig:
 
     @property
     def cache_path(self) -> Path:
-        return Path(self.cache_root) / f"{self.account}" / "siginfo.sig"
+        return Path(self.cache_root or Storage.cache_dir) / f"{self.account}" / "siginfo.sig"

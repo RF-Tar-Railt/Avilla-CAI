@@ -55,7 +55,7 @@ class CAIVideoResource(CAIResource):
     md5: bytes | None = None
     size: int | None = None
     length: int | None = None
-    thumb_size: int | None = None,
+    thumb_size: int | None = None
     thumb_md5: bytes | None = None
 
     def __init__(

@@ -71,7 +71,7 @@ class CAIMessageSerializer(MessageSerializer["CAIProtocol"]):
         return await client.upload_voice(int(gid), BytesIO(raw))
 
     @elem_rec(Video)
-    async def voice(self, protocol: "CAIProtocol", element: Video):
+    async def video(self, protocol: "CAIProtocol", element: Video):
         rs = ctx_relationship.get()
         raw = await rs.fetch(element.resource)
         mainline = rs.mainline
@@ -85,5 +85,5 @@ class CAIMessageSerializer(MessageSerializer["CAIProtocol"]):
         return ShakeElement(element.stype, int(element.target.pattern['contact']))
 
     @elem_rec(Custom)
-    def shake(self, protocol: "CAIProtocol", element: Custom):
+    def custom(self, protocol: "CAIProtocol", element: Custom):
         return CustomDataElement(element.data)

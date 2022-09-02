@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from graia.amnesia.message.element import Element
 from avilla.core.utilles.selector import Selector
-from avilla.core.elements import Picture, Element
+from avilla.core.elements import Picture
 
 
 class Custom(Element):

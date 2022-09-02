@@ -32,9 +32,9 @@ class CAIProtocol(BaseProtocol):
             humanized_name="CAI - Another Bot Framework for Tencent QQ Written in Python",
         ),
     )
-    event_parser = CAIEventParser()
-    message_serializer = CAIMessageSerializer()
-    message_deserializer = CAIMessageDeserializer()
+    event_parser: CAIEventParser = CAIEventParser()
+    message_serializer: CAIMessageSerializer = CAIMessageSerializer()
+    message_deserializer: CAIMessageDeserializer = CAIMessageDeserializer()
     """
     query_handlers: ClassVar[list[type[ProtocolAbstractQueryHandler]]] = [
         ElizabethGroupQuery,
@@ -50,7 +50,7 @@ class CAIProtocol(BaseProtocol):
     service: CAIService
 
     def __init__(self, *config: CAIConfig):
-        self.configs = list(set(config))
+        self.configs: list[CAIConfig] = list(set(config))
         super().__init__()
 
     def ensure(self, avilla: Avilla):
@@ -71,7 +71,7 @@ class CAIProtocol(BaseProtocol):
                 event.ctx.pattern[event.ctx.latest_key] == event.account.id
                 and event.ctx.pattern.get("land") == event.account.land.name
             ):
-                name = ""
+                name: str = ""
                 with suppress(NotImplementedError):
                     name = (await rs.pull(Summary, event.message.mainline)).name
                 mainline = event.message.mainline.pattern[event.message.mainline.latest_key]
@@ -81,11 +81,11 @@ class CAIProtocol(BaseProtocol):
                     f" <- {str(event.message.content)!r}"
                 )
             else:
-                main_name = ""
+                main_name: str = ""
                 with suppress(NotImplementedError):
                     main_name = (await rs.pull(Summary, event.message.mainline)).name
                 mainline = event.message.mainline.pattern[event.message.mainline.latest_key]
-                ctx_name = ""
+                ctx_name: str = ""
                 with suppress(NotImplementedError):
                     ctx_name = (await rs.pull(Summary, event.message.sender)).name
                 ctx = event.ctx.pattern[event.ctx.latest_key]

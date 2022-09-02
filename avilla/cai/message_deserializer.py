@@ -45,7 +45,7 @@ class CAIMessageDeserializer(MessageDeserializer["CAIProtocol"]):
 
     @deserializer("at")
     def at(self, protocol: "CAIProtocol", raw: AtElement):
-        return Notice(Selector().contact(str(raw.target)).display(raw.display))  # 请使用 rs.complete.
+        return Notice(Selector().contact(str(raw.target)).display(raw.display or ''))  # 请使用 rs.complete.
 
     @deserializer("at_all")
     def at_all(self, protocol: "CAIProtocol", raw: AtAllElement):

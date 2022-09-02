@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Callable, Coroutine, Any
 from graia.amnesia.message import MessageChain
-from cai.client import Event
+from cai.client.events import Event
 from cai.client.events.group import GroupMessageRecalledEvent, GroupNudgeEvent
 from cai.client.events.common import (
     GroupMessage,
@@ -83,7 +83,7 @@ class CAIEventParser(AbstractEventParser["CAIProtocol"]):
         return AccountAvailable(account)
 
     @event("BotOfflineEvent")
-    async def bot_online_event(
+    async def bot_off_event(
         self, protocol: CAIProtocol, account: CAIAccount, raw: BotOfflineEvent
     ):
         assert int(account.id) == raw.qq

@@ -1,8 +1,9 @@
 from __future__ import annotations
 import asyncio
-from typing import TYPE_CHECKING, Set, Literal, Dict
+from functools import partial
+from typing import TYPE_CHECKING, Set, Literal, Dict, Tuple
 from cai import Client
-from cai.client import Event
+from cai.client.events import Event
 from launart import Launart, Service
 from loguru import logger
 
@@ -36,15 +37,13 @@ class CAIService(Service):
                 return client
         raise ValueError(f"Account {account_id} not found")
 
-    async def _cai_event_hook(self, _: Client, event: Event):
-        event = await self.protocol.event_parser.parse_event(
-            self.protocol, self.protocol.get_account(
-                selector=Selector().land(self.protocol.land).account(str(self.client_map[_].account))
-            ), event
+    async def _cai_event_hook(self, _: Client, event: Event, account: CAIAccount):
+        parsed_event = await self.protocol.event_parser.parse_event(
+            self.protocol, account, event
         )
-        if event:
-            await self.protocol.record_event(event)
-            self.protocol.post_event(event)
+        if parsed_event:
+            await self.protocol.record_event(parsed_event)
+            self.protocol.post_event(parsed_event)
 
     def get_interface(self, interface_type):
         return None
@@ -72,12 +71,13 @@ class CAIService(Service):
                         await client.login()
                 except Exception as e:
                     await login_resolver(client, e)
-                self.protocol.avilla.add_account(CAIAccount(str(config.account), self.protocol))
+                account = CAIAccount(str(config.account), self.protocol)
+                self.protocol.avilla.add_account(account)
                 logger.opt(colors=True).success(
                     f"<green>Registered account:</> <magenta>{config.account}</>",
                     alt=f"[green]Registered account:[/] [magenta]{config.account}[/]",
                 )
-                client.add_event_listener(self._cai_event_hook)
+                client.add_event_listener(partial(self._cai_event_hook, account=account))
         async with self.stage("blocking"):
             exit_signal = asyncio.create_task(manager.status.wait_for_sigexit())
             while not exit_signal.done():
