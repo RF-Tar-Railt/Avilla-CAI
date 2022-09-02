@@ -12,7 +12,22 @@ class Custom(Element):
         self.data = data
 
     def __str__(self) -> str:
-        return "[$Custom]"
+        return f"[$Custom:data=b'{self.data}']"
+
+
+class Face(Element):
+    id: int
+
+    def __init__(self, face_id: int):
+        self.id = face_id
+
+    def __str__(self) -> str:
+        return f"[$Face:id={self.id}]"
+
+
+class Emoji(Picture):
+    def __str__(self) -> str:
+        return "[$Emoji]"
 
 
 class Flash(Picture):

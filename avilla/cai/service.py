@@ -1,16 +1,10 @@
 from __future__ import annotations
 import asyncio
-from functools import partial
-from typing import TYPE_CHECKING, Set, Literal, Dict, Tuple
-from cai import Client
-from cai.client.events import Event
+from typing import TYPE_CHECKING, Set, Literal, List
 from launart import Launart, Service
 from loguru import logger
-
-from avilla.core.utilles.selector import Selector
-from avilla.cai.utils import wait_fut, login_resolver
-from avilla.cai.config import CAIConfig
-from avilla.cai.account import CAIAccount
+from avilla.cai.client import CAIClient
+from avilla.cai.utils import login_resolver
 
 if TYPE_CHECKING:
     from .protocol import CAIProtocol
@@ -21,29 +15,23 @@ class CAIService(Service):
     supported_interface_types = set()
 
     protocol: CAIProtocol
-    client_map: Dict[Client, CAIConfig]
+    clients: List[CAIClient]
 
     def __init__(self, protocol: CAIProtocol):
         self.protocol = protocol
-        self.client_map = {}
+        self.clients = []
         super().__init__()
 
     def had_client(self, account_id: str):
-        return any(account_id == str(config.account) for config in self.client_map.values())
+        return any(
+            account_id == str(client.config.account) for client in self.clients
+        )
 
     def get_client(self, account_id: str):
-        for client, config in self.client_map.items():
-            if str(config.account) == account_id:
+        for client in self.clients:
+            if str(client.config.account) == account_id:
                 return client
         raise ValueError(f"Account {account_id} not found")
-
-    async def _cai_event_hook(self, _: Client, event: Event, account: CAIAccount):
-        parsed_event = await self.protocol.event_parser.parse_event(
-            self.protocol, account, event
-        )
-        if parsed_event:
-            await self.protocol.record_event(parsed_event)
-            self.protocol.post_event(parsed_event)
 
     def get_interface(self, interface_type):
         return None
@@ -58,40 +46,34 @@ class CAIService(Service):
 
     async def launch(self, manager: Launart):
         async with self.stage("preparing"):
-            for client, config in self.client_map.items():
+            for ci in self.clients:
                 logger.opt(colors=True).info(
-                    f"waiting for <magenta>{config.account}</> login...",
-                    alt=f"waiting for [magenta]{config.account}[/] login...",
+                    f"waiting for <magenta>{ci.config.account}</> login...",
+                    alt=f"waiting for [magenta]{ci.config.account}[/] login...",
                 )
                 try:
-                    if config.cache_siginfo and config.cache_path.exists():
-                        logger.debug(f"using account {config.account}'s siginfo")
-                        await client.token_login(config.cache_path.open("rb").read())
+                    if ci.config.cache_siginfo and ci.config.cache_path.exists():
+                        logger.debug(f"using account {ci.config.account}'s siginfo")
+                        await ci.client.token_login(ci.config.cache_path.open("rb").read())
                     else:
-                        await client.login()
+                        await ci.client.login()
                 except Exception as e:
-                    await login_resolver(client, e)
-                account = CAIAccount(str(config.account), self.protocol)
-                self.protocol.avilla.add_account(account)
-                logger.opt(colors=True).success(
-                    f"<green>Registered account:</> <magenta>{config.account}</>",
-                    alt=f"[green]Registered account:[/] [magenta]{config.account}[/]",
-                )
-                client.add_event_listener(partial(self._cai_event_hook, account=account))
-        async with self.stage("blocking"):
-            exit_signal = asyncio.create_task(manager.status.wait_for_sigexit())
-            while not exit_signal.done():
-                await wait_fut(
-                    [asyncio.sleep(0.5), exit_signal],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-        async with self.stage("cleanup"):
-            for client, config in self.client_map.items():
-                await client.close()
-                if config.cache_siginfo:
-                    data = client.dump_sig()
-                    config.cache_path.parent.mkdir(parents=True, exist_ok=True)
-                    with config.cache_path.open("wb+") as f:
-                        f.write(data)
-                    logger.success(f"account {config.account}'s siginfo saved.")
+                    await login_resolver(ci.client, e)
+                ci.register()
 
+        async with self.stage("blocking"):
+            if self.clients:
+                await asyncio.wait(
+                    [
+                        client.status.wait_for(
+                            "blocking-completed",  # type: ignore
+                            "waiting-for-cleanup",  # type: ignore
+                            # "cleanup",  # type: ignore
+                            # "finished",  # type: ignore
+                        )
+                        for client in self.clients
+                    ]
+                )
+
+        async with self.stage("cleanup"):
+            ...  # TODO

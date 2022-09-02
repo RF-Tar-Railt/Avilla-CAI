@@ -12,7 +12,8 @@ from cai.client.message_service.models import (
     VoiceElement,
     VideoElement,
     ShakeElement,
-    CustomDataElement
+    CustomDataElement,
+    FaceElement,
 )
 
 from graia.amnesia.message.element import Element as GraiaElement, Text
@@ -21,7 +22,7 @@ from avilla.core.elements import Audio, Notice, NoticeAll, Picture, Video
 from avilla.core.utilles.message_deserializer import MessageDeserializer, deserializer
 from avilla.core.utilles.selector import Selector
 
-from avilla.cai.element import Flash, Shake, Custom
+from avilla.cai.element import Flash, Shake, Custom, Face, Emoji
 from avilla.cai.resource import CAIAudioResource, CAIImageResource, CAIVideoResource
 
 if TYPE_CHECKING:
@@ -45,16 +46,23 @@ class CAIMessageDeserializer(MessageDeserializer["CAIProtocol"]):
 
     @deserializer("at")
     def at(self, protocol: "CAIProtocol", raw: AtElement):
-        return Notice(Selector().contact(str(raw.target)).display(raw.display or ''))  # 请使用 rs.complete.
+        return Notice(
+            Selector().contact(str(raw.target)).display(raw.display or "")
+        )  # 请使用 rs.complete.
 
     @deserializer("at_all")
     def at_all(self, protocol: "CAIProtocol", raw: AtAllElement):
         return NoticeAll()
 
+    @deserializer("face")
+    def at_all(self, protocol: "CAIProtocol", raw: FaceElement):
+        return Face(raw.id)
+
     @deserializer("image")
     def image(self, protocol: "CAIProtocol", raw: ImageElement):
         # mainline 后续修饰
-        return Picture(CAIImageResource(raw.filename, raw.url))
+        res = CAIImageResource(raw.filename, raw.url)
+        return Emoji(res) if raw.is_emoji else Picture(res)
 
     @deserializer("flash_image")
     def flash_image(self, protocol: "CAIProtocol", raw: FlashImageElement):
@@ -66,9 +74,16 @@ class CAIMessageDeserializer(MessageDeserializer["CAIProtocol"]):
 
     @deserializer("video")
     def video(self, protocol: "CAIProtocol", raw: VideoElement):
-        return Video(CAIVideoResource(
-            raw.file_name, raw.file_md5, raw.file_size, raw.file_time, raw.thumb_size, raw.thumb_md5
-        ))
+        return Video(
+            CAIVideoResource(
+                raw.file_name,
+                raw.file_md5,
+                raw.file_size,
+                raw.file_time,
+                raw.thumb_size,
+                raw.thumb_md5,
+            )
+        )
 
     @deserializer("shake")
     def shake(self, protocol: "CAIProtocol", raw: ShakeElement):

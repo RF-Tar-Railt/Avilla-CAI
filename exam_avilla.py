@@ -12,10 +12,11 @@ from avilla.core.elements import Picture, Notice
 from avilla.core.event.message import MessageReceived, MessageRevoked
 from avilla.core.relationship import Relationship
 from avilla.core.skeleton.message import MessageTrait
+from avilla.core.utilles.selector import Selector
 
 from avilla.cai.protocol import CAIProtocol
 from avilla.cai.config import CAIConfig
-from avilla.cai.element import Custom
+from avilla.cai.element import Custom, Emoji, Shake, Face
 
 protocol = CAIProtocol(
     CAIConfig(os.getenv("CAI_ACCOUNT", ""), os.getenv("CAI_PASSWORD", ""))
@@ -49,10 +50,14 @@ async def on_message_received(
     elif rs.ctx.follows(
         "group.member(3165388245)"
     ) and event.message.content.startswith("hello"):
-        msg = await rs.send_message("this msg will be recalled in 10s.")
-        await asyncio.sleep(10)
+        msg = await rs.send_message("this msg will be recalled in 2s.")
+        await asyncio.sleep(2)
+        await rs.send_message([Face(12)])
         await rs.cast(MessageTrait).revoke(msg)
         await rs.send_message([Picture("test.png")])
+        await rs.send_message("next will be emoji")
+        await rs.send_message([Emoji("test.png")])
+        await rs.send_message([Shake(0, Selector().contact("3165388245"))])
 
 
 @broadcast.receiver(MessageRevoked)

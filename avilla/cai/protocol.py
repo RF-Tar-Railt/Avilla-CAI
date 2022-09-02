@@ -1,22 +1,16 @@
 from __future__ import annotations
 
-from contextlib import suppress
-from cai import Client
-from loguru import logger
-from avilla.core.event import AvillaEvent
-from avilla.core.event.message import MessageReceived
-from avilla.core.event.lifecycle import AccountStatusChanged
 from avilla.core.application import Avilla
 from avilla.core.platform import Abstract, Land, Platform
 from avilla.core.protocol import BaseProtocol
 from avilla.core.trait.context import wrap_namespace
-from avilla.core.cell.cells import Summary
 
 from avilla.cai.event_parser import CAIEventParser
 from avilla.cai.message_deserializer import CAIMessageDeserializer
 from avilla.cai.message_serializer import CAIMessageSerializer
 from avilla.cai.service import CAIService
 from avilla.cai.config import CAIConfig
+from avilla.cai.client import CAIClient
 
 
 class CAIProtocol(BaseProtocol):
@@ -35,12 +29,6 @@ class CAIProtocol(BaseProtocol):
     event_parser: CAIEventParser = CAIEventParser()
     message_serializer: CAIMessageSerializer = CAIMessageSerializer()
     message_deserializer: CAIMessageDeserializer = CAIMessageDeserializer()
-    """
-    query_handlers: ClassVar[list[type[ProtocolAbstractQueryHandler]]] = [
-        ElizabethGroupQuery,
-        ElizabethRootQuery,
-    ]
-    """
 
     with wrap_namespace() as impl_namespace:
         import avilla.cai.impl as _  # noqa
@@ -58,47 +46,6 @@ class CAIProtocol(BaseProtocol):
         self.service = CAIService(self)
         avilla.launch_manager.add_service(self.service)
         for config in self.configs:
-            config.init_dir()
-            self.service.client_map[
-                Client(int(config.account), config.password, config.protocol)
-            ] = config
-
-    @staticmethod
-    async def record_event(event: AvillaEvent):
-        if isinstance(event, MessageReceived):
-            rs = await event.account.get_relationship(event.ctx)
-            if (
-                event.ctx.pattern[event.ctx.latest_key] == event.account.id
-                and event.ctx.pattern.get("land") == event.account.land.name
-            ):
-                name: str = ""
-                with suppress(NotImplementedError):
-                    name = (await rs.pull(Summary, event.message.mainline)).name
-                mainline = event.message.mainline.pattern[event.message.mainline.latest_key]
-                logger.info(
-                    f"{event.account.land.name}: [send]"
-                    f"[{event.message.mainline.latest_key.title()}({f'{name}, ' if name else ''}{mainline})]"
-                    f" <- {str(event.message.content)!r}"
-                )
-            else:
-                main_name: str = ""
-                with suppress(NotImplementedError):
-                    main_name = (await rs.pull(Summary, event.message.mainline)).name
-                mainline = event.message.mainline.pattern[event.message.mainline.latest_key]
-                ctx_name: str = ""
-                with suppress(NotImplementedError):
-                    ctx_name = (await rs.pull(Summary, event.message.sender)).name
-                ctx = event.ctx.pattern[event.ctx.latest_key]
-                out = f"[{event.message.mainline.latest_key.title()}({f'{main_name}, ' if main_name else ''}{mainline})]"
-                if ctx != mainline:
-                    out += f" {ctx_name or event.ctx.latest_key.title()}({ctx})"
-
-                logger.info(
-                    f"{event.account.land.name}: [recv]{out}"
-                    f" -> {str(event.message.content)!r}"
-                )
-        elif not isinstance(event, AccountStatusChanged):
-            logger.info(
-                f"{event.account.land.name}: {event.__class__.__name__} from "
-                f"{'.'.join(f'{k}({v})' for k, v in event.ctx.pattern.items() if k != 'land')}"
-            )
+            client = CAIClient(self, config)
+            self.service.clients.append(client)
+            avilla.launch_manager.add_launchable(client)

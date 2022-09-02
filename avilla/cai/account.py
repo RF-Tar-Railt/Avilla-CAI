@@ -34,7 +34,7 @@ class CAIAccount(AbstractAccount):
 
     @property
     def client(self) -> Client:
-        return self.protocol.service.get_client(self.id)
+        return self.protocol.service.get_client(self.id).client
 
     @property
     def available(self) -> bool:

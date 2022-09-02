@@ -6,6 +6,7 @@ from cai.client.message_service.models import (
     Element,
     AtElement,
     AtAllElement,
+    FaceElement,
     TextElement,
     ShakeElement,
     CustomDataElement
@@ -16,7 +17,7 @@ from avilla.core.context import ctx_relationship
 from avilla.core.elements import Audio, Notice, NoticeAll, Picture, Video
 from avilla.core.exceptions import UnsupportedOperation
 from avilla.core.utilles.message_serializer import MessageSerializer, element as elem_rec
-from avilla.cai.element import Flash, Custom, Shake
+from avilla.cai.element import Flash, Custom, Shake, Face, Emoji
 
 if TYPE_CHECKING:
     from .protocol import CAIProtocol
@@ -40,45 +41,59 @@ class CAIMessageSerializer(MessageSerializer["CAIProtocol"]):
     def at_all(self, protocol: "CAIProtocol", element: NoticeAll):
         return AtAllElement()
 
+    @elem_rec(Face)
+    def face(self, protocol: "CAIProtocol", element: Face):
+        return FaceElement(element.id)
+
     @elem_rec(Picture)
     async def image(self, protocol: "CAIProtocol", element: Picture):
         rs = ctx_relationship.get()
         raw = await rs.fetch(element.resource)
         mainline = rs.mainline
-        client = protocol.service.get_client(rs.account.id)
+        ci = protocol.service.get_client(rs.account.id)
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send image in group")
-        return await client.upload_image(int(gid), BytesIO(raw))
+        return await ci.client.upload_image(int(gid), BytesIO(raw))
+
+    @elem_rec(Emoji)
+    async def emoji(self, protocol: "CAIProtocol", element: Emoji):
+        rs = ctx_relationship.get()
+        raw = await rs.fetch(element.resource)
+        mainline = rs.mainline
+        ci = protocol.service.get_client(rs.account.id)
+        if not (gid := mainline.pattern.get('group')):
+            raise UnsupportedOperation("current cai can only send image in group")
+        return await ci.client.upload_image(int(gid), BytesIO(raw), True)
 
     @elem_rec(Flash)
     async def flash_image(self, protocol: "CAIProtocol", element: Flash):
         rs = ctx_relationship.get()
         raw = await rs.fetch(element.resource)
         mainline = rs.mainline
-        client = protocol.service.get_client(rs.account.id)
+        ci = protocol.service.get_client(rs.account.id)
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send flash-image in group")
-        return (await client.upload_image(int(gid), BytesIO(raw))).to_flash()
+        return (await ci.client.upload_image(int(gid), BytesIO(raw))).to_flash()
 
     @elem_rec(Audio)
     async def voice(self, protocol: "CAIProtocol", element: Audio):
         rs = ctx_relationship.get()
         raw = await rs.fetch(element.resource)
         mainline = rs.mainline
-        client = protocol.service.get_client(rs.account.id)
+        ci = protocol.service.get_client(rs.account.id)
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send voice in group")
-        return await client.upload_voice(int(gid), BytesIO(raw))
+        return await ci.client.upload_voice(int(gid), BytesIO(raw))
 
     @elem_rec(Video)
     async def video(self, protocol: "CAIProtocol", element: Video):
         rs = ctx_relationship.get()
         raw = await rs.fetch(element.resource)
         mainline = rs.mainline
-        client = protocol.service.get_client(rs.account.id)
+        ci = protocol.service.get_client(rs.account.id)
         if not (gid := mainline.pattern.get('group')):
             raise UnsupportedOperation("current cai can only send voice in group")
-        return await client.upload_video(int(gid), BytesIO(raw), BytesIO(raw))
+        return await ci.client.upload_video(int(gid), BytesIO(raw), BytesIO(raw))
 
     @elem_rec(Shake)
     def shake(self, protocol: "CAIProtocol", element: Shake):
