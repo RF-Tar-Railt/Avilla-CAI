@@ -12,7 +12,7 @@ class Custom(Element):
         self.data = data
 
     def __str__(self) -> str:
-        return f"[$Custom:data=b'{self.data}']"
+        return f"[$Custom:data={self.data}]"
 
 
 class Face(Element):

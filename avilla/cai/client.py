@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING
 from cai import Client
 from cai.client.events import Event
@@ -13,9 +12,10 @@ from avilla.core.event.lifecycle import AccountStatusChanged
 from avilla.core.cell.cells import Summary
 
 from .config import CAIConfig
-from .utils import wait_fut
+from .utils import login_resolver
 
 if TYPE_CHECKING:
+    from .account import CAIAccount
     from .protocol import CAIProtocol
 
 
@@ -23,6 +23,7 @@ class CAIClient(Launchable):
     protocol: CAIProtocol
     config: CAIConfig
     client: Client
+    account: CAIAccount
 
     @property
     def required(self):
@@ -30,7 +31,7 @@ class CAIClient(Launchable):
 
     @property
     def stages(self):
-        return {"blocking", "cleanup"}
+        return {"preparing", "cleanup"}
 
     def register(self):
         # NOTE: for hot registration
@@ -57,7 +58,6 @@ class CAIClient(Launchable):
         )
         self.protocol = protocol
         self.config = config
-        self.config.init_dir()
         self.client = Client(int(self.config.account), self.config.password, self.config.protocol)
         self.account = CAIAccount(str(self.config.account), self.protocol)
 
@@ -109,13 +109,20 @@ class CAIClient(Launchable):
             self.protocol.post_event(parsed_event)
 
     async def launch(self, manager: Launart):
-        async with self.stage("blocking"):
-            exit_signal = asyncio.create_task(manager.status.wait_for_sigexit())
-            while not exit_signal.done():
-                await wait_fut(
-                    [asyncio.sleep(0.5), exit_signal],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
+        async with self.stage("preparing"):
+            logger.opt(colors=True).info(
+                f"waiting for <magenta>{self.config.account}</> login...",
+                alt=f"waiting for [magenta]{self.config.account}[/] login...",
+            )
+            try:
+                if self.config.cache_siginfo and self.config.cache_path.exists():
+                    logger.debug(f"using account {self.config.account}'s siginfo")
+                    await self.client.token_login(self.config.cache_path.open("rb").read())
+                else:
+                    await self.client.login()
+            except Exception as e:
+                await login_resolver(self.client, e)
+            self.register()
         async with self.stage("cleanup"):
             await self.client.session.close()
             if self.config.cache_siginfo:

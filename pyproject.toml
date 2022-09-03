@@ -37,10 +37,12 @@ includes = ["avilla/cai"]
 [tool.pdm.dev-dependencies]
 dev = [
     "Pillow>=9.2.0",
-    "arclet-alconna>=1.2.0.5",
+    "arclet-alconna>=1.2.0.7",
     "devtools>=0.9.0",
     "creart>=0.2.2",
     "creart-graia>=0.1.5",
     "aiohttp>=3.8.1",
     "richuru>=0.1.1",
+    "arclet-alconna-avilla>=0.1.1",
+    "graiax-shortcut>=0.1.0",
 ]

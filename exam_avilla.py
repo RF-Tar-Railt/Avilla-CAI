@@ -4,7 +4,7 @@ import os
 from creart import create
 from graia.amnesia.builtins.aiohttp import AiohttpClientService
 from graia.broadcast import Broadcast
-from arclet.alconna import Alconna, Args, Option, ArgField, CommandMeta
+from arclet.alconna import Alconna, Args, Option, ArgField, CommandMeta, Arpamar
 
 from avilla.core.account import AbstractAccount
 from avilla.core.application import Avilla
@@ -17,6 +17,8 @@ from avilla.core.utilles.selector import Selector
 from avilla.cai.protocol import CAIProtocol
 from avilla.cai.config import CAIConfig
 from avilla.cai.element import Custom, Emoji, Shake, Face
+
+from arclet.alconna.avilla import Alc
 
 protocol = CAIProtocol(
     CAIConfig(os.getenv("CAI_ACCOUNT", ""), os.getenv("CAI_PASSWORD", ""))
@@ -70,13 +72,10 @@ async def on_message_revoked(
     await rs.send_message([Custom(b"Hey! I'm a human!")])
 
 
-@broadcast.receiver(MessageReceived)
-async def test_(rs: Relationship, event: MessageReceived):
+@broadcast.receiver(MessageReceived, dispatchers=[Alc(alc1, send_flag='reply')])
+async def test_(rs: Relationship, event: MessageReceived, res: Arpamar):
     if rs.ctx.follows("group.member(3165388245)"):
-        if (res := alc.parse(event.message.content)).matched:
-            await rs.send_message(f"{res.source.get_help()}")
-        elif (res := alc1.parse(event.message.content)).matched:
-            await rs.send_message(f"{res.source.get_help()}")
+        await rs.send_message(f"{res}")
 
 
 avilla.launch_manager.launch_blocking(loop=broadcast.loop)
