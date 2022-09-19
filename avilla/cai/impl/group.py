@@ -8,8 +8,8 @@ from cai.client.models import Group, GroupMember
 
 from avilla.core.cell.cells import Nick, Privilege, Summary
 from avilla.core.exceptions import permission_error_message
-from avilla.core.skeleton.message import MessageTrait
-from avilla.core.skeleton.privilege import MuteTrait, PrivilegeTrait
+from avilla.core.skeleton.message import MessageRevoke, MessageSend
+from avilla.core.skeleton.privilege import MuteTrait, PrivilegeTrait, MuteAllTrait
 from avilla.core.skeleton.scene import SceneTrait
 from avilla.core.skeleton.summary import SummaryTrait
 from avilla.core.trait.context import prefix, raise_for_no_namespace, scope
@@ -24,12 +24,12 @@ if TYPE_CHECKING:
 raise_for_no_namespace()
 
 with scope("avilla-cai", "group"), prefix("group"):
-    @default_target(MessageTrait.send)
+    @default_target(MessageSend.send)
     def send_group_message_default_target(rs: Relationship):
         return rs.mainline
 
 
-    @impl(MessageTrait.send)
+    @impl(MessageSend.send)
     async def send_group_message(
             rs: Relationship, target: Selector, message: MessageChain, *, reply: Selector | None = None
     ) -> Selector:
@@ -43,7 +43,7 @@ with scope("avilla-cai", "group"), prefix("group"):
             str(result[1])).time(str(result[2]))
 
 
-    @impl(MessageTrait.revoke)
+    @impl(MessageRevoke.revoke)
     async def revoke_group_message(rs: Relationship, message: Selector):
         assert isinstance(rs.account, CAIAccount)
         await rs.account.client.recall_group_msg(
@@ -82,12 +82,12 @@ with scope("avilla-cai", "group"), prefix("group"):
         raise NotImplementedError
 
 
-    @impl(MuteTrait.mute_all)
+    @impl(MuteAllTrait.mute_all)
     async def group_mute_all(rs: Relationship, target: Selector):
         raise NotImplementedError
 
 
-    @impl(MuteTrait.unmute_all)
+    @impl(MuteAllTrait.unmute_all)
     async def group_unmute_all(rs: Relationship, target: Selector):
         raise NotImplementedError
 

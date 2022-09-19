@@ -7,7 +7,7 @@ from contextlib import suppress
 from cai.client.models import Friend
 from graia.amnesia.message import MessageChain
 from avilla.core.cell.cells import Nick, Summary
-from avilla.core.skeleton.message import MessageTrait
+from avilla.core.skeleton.message import MessageRevoke, MessageSend
 from avilla.core.trait.context import prefix, raise_for_no_namespace, scope
 from avilla.core.trait.recorder import default_target, impl, pull, query
 from avilla.core.utilles.selector import Selector
@@ -23,11 +23,11 @@ raise_for_no_namespace()
 
 with scope("avilla-cai", "friend"), prefix("friend"):
 
-    @default_target(MessageTrait.send)
+    @default_target(MessageSend.send)
     def send_friend_message_default_target(rs: Relationship):
         return rs.ctx
 
-    @impl(MessageTrait.send)
+    @impl(MessageSend.send)
     async def send_friend_message(
         rs: Relationship,
         target: Selector,
@@ -57,7 +57,7 @@ with scope("avilla-cai", "friend"), prefix("friend"):
             .time(str(result[2]))
         )
 
-    @impl(MessageTrait.revoke)
+    @impl(MessageRevoke.revoke)
     async def revoke_friend_message(rs: Relationship, message: Selector):
         assert isinstance(rs.account, CAIAccount)
         await rs.account.client.recall_friend_msg(

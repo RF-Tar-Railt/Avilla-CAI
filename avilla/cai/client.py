@@ -49,13 +49,7 @@ class CAIClient(Launchable):
         super().__init__()
         from avilla.cai.account import CAIAccount
 
-        self.id = ".".join(
-            [
-                "cai",
-                "client",
-                str(config.account)
-            ]
-        )
+        self.id = f"cai.client.{config.account}"
         self.protocol = protocol
         self.config = config
         self.client = Client(int(self.config.account), self.config.password, self.config.protocol)

@@ -11,14 +11,14 @@ from avilla.core.application import Avilla
 from avilla.core.elements import Picture, Notice
 from avilla.core.event.message import MessageReceived, MessageRevoked
 from avilla.core.relationship import Relationship
-from avilla.core.skeleton.message import MessageTrait
+from avilla.core.skeleton.message import MessageSend, MessageRevoke
 from avilla.core.utilles.selector import Selector
 
 from avilla.cai.protocol import CAIProtocol
 from avilla.cai.config import CAIConfig
 from avilla.cai.element import Custom, Emoji, Shake, Face
 
-from arclet.alconna.avilla import Alc
+#from arclet.alconna.avilla import Alc
 
 protocol = CAIProtocol(
     CAIConfig(os.getenv("CAI_ACCOUNT", ""), os.getenv("CAI_PASSWORD", ""))
@@ -55,7 +55,7 @@ async def on_message_received(
         msg = await rs.send_message("this msg will be recalled in 2s.")
         await asyncio.sleep(2)
         await rs.send_message([Face(12)])
-        await rs.cast(MessageTrait).revoke(msg)
+        await rs.cast(MessageRevoke).revoke(msg)
         await rs.send_message([Picture("test.png")])
         await rs.send_message("next will be emoji")
         await rs.send_message([Emoji("test.png")])
@@ -71,11 +71,11 @@ async def on_message_revoked(
     print("[message]", event.message)
     await rs.send_message([Custom(b"Hey! I'm a human!")])
 
-
-@broadcast.receiver(MessageReceived, dispatchers=[Alc(alc1, send_flag='reply')])
-async def test_(rs: Relationship, event: MessageReceived, res: Arpamar):
-    if rs.ctx.follows("group.member(3165388245)"):
-        await rs.send_message(f"{res}")
+#
+# @broadcast.receiver(MessageReceived, dispatchers=[Alc(alc1, send_flag='reply')])
+# async def test_(rs: Relationship, event: MessageReceived, res: Arpamar):
+#     if rs.ctx.follows("group.member(3165388245)"):
+#         await rs.send_message(f"{res}")
 
 
 avilla.launch_manager.launch_blocking(loop=broadcast.loop)

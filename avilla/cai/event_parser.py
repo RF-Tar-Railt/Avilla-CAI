@@ -2,29 +2,55 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Callable, Coroutine, Any
-from graia.amnesia.message import MessageChain
-from cai.client.events import Event
-from cai.client.events.group import GroupMessageRecalledEvent, GroupNudgeEvent
-from cai.client.events.common import (
-    GroupMessage,
-    PrivateMessage,
-    TempMessage,
-    BotOnlineEvent,
-    BotOfflineEvent,
-    NudgeEvent,
-)
-from cai.client.message_service.models import ReplyElement
-from loguru import logger
+from typing import TYPE_CHECKING, Any, Callable, Coroutine
 
-from avilla.core.event import AvillaEvent
+from avilla.core.cell.cells import Summary
+from avilla.core.event import (
+    AvillaEvent,
+    MetadataModify,
+    MetadataModified,
+    RelationshipCreated,
+    RelationshipDestroyed,
+)
+from avilla.core.event.activity import ActivityTrigged
 from avilla.core.event.lifecycle import AccountAvailable, AccountUnavailable
 from avilla.core.event.message import MessageReceived, MessageRevoked
-from avilla.core.event.activity import ActivityTrigged
+from avilla.core.event.request import RequestReceived
 from avilla.core.message import Message
+from avilla.core.request import Request
 from avilla.core.utilles.event_parser import AbstractEventParser, event
 from avilla.core.utilles.selector import Selector
 
+from cai.client.events import Event
+from cai.client.events.common import (
+    BotOfflineEvent,
+    BotOnlineEvent,
+    GroupMessage,
+    NudgeEvent,
+    PrivateMessage,
+    TempMessage,
+)
+from cai.client.events.group import (
+    GroupLuckyCharacterChangedEvent,
+    GroupLuckyCharacterClosedEvent,
+    GroupLuckyCharacterInitEvent,
+    GroupLuckyCharacterNewEvent,
+    GroupLuckyCharacterOpenedEvent,
+    GroupMemberJoinedEvent,
+    GroupMemberLeaveEvent,
+    GroupMemberMutedEvent,
+    GroupMemberUnMutedEvent,
+    GroupMemberPermissionChangeEvent,
+    GroupMemberSpecialTitleChangedEvent,
+    GroupMessageRecalledEvent,
+    GroupNameChangedEvent,
+    GroupNudgeEvent,
+    JoinGroupRequestEvent,
+    TransferGroupEvent,
+)
+from cai.client.message_service.models import ReplyElement
+from graia.amnesia.message import MessageChain
+from loguru import logger
 
 if TYPE_CHECKING:
     from .account import CAIAccount
@@ -80,14 +106,14 @@ class CAIEventParser(AbstractEventParser["CAIProtocol"]):
         self, protocol: CAIProtocol, account: CAIAccount, raw: BotOnlineEvent
     ):
         assert int(account.id) == raw.qq
-        return AccountAvailable(account)
+        return AccountAvailable(protocol.avilla, account)
 
     @event("BotOfflineEvent")
     async def bot_off_event(
         self, protocol: CAIProtocol, account: CAIAccount, raw: BotOfflineEvent
     ):
         assert int(account.id) == raw.qq
-        return AccountUnavailable(account)
+        return AccountUnavailable(protocol.avilla, account)
 
     @event("group_message")
     async def group_message(
@@ -208,13 +234,13 @@ class CAIEventParser(AbstractEventParser["CAIProtocol"]):
     ):
         return MessageRevoked(
             message=Selector()
-            .land(protocol.land)
+            .land(protocol.land.name)
             .group(str(raw.group_id))
             .message(str(raw.msg_seq))
             .random(str(raw.msg_random))
             .time(str(raw.msg_time)),
             operator=Selector()
-            .land(protocol.land)
+            .land(protocol.land.name)
             .group(str(raw.group_id))
             .member(str(raw.operator_id)),
             account=account,
@@ -226,16 +252,18 @@ class CAIEventParser(AbstractEventParser["CAIProtocol"]):
         self, protocol: CAIProtocol, account: CAIAccount, raw: NudgeEvent
     ):
         nudge = ActivityTrigged(account)
-        nudge.id = Selector().activity("nudge_trigger")
-        nudge.activity = Selector().nudge(raw.action)
+        nudge.id = Selector().land(protocol.land.name).activity("nudge_trigger")
+        nudge.activity = Selector().land(protocol.land.name).nudge(raw.action)
         if raw.group:
-            nudge.mainline = Selector().group(str(raw.group))
-            nudge.trigger = Selector().group(str(raw.group)).member(str(raw.sender))
-            nudge.extra['target'] = Selector().group(str(raw.group)).member(str(raw.target))
+            nudge.mainline = Selector().land(protocol.land.name).group(str(raw.group))
+            nudge.trigger = Selector().land(protocol.land.name).group(str(raw.group)).member(str(raw.sender))
+            nudge.extra["target"] = (
+                Selector().land(protocol.land.name).group(str(raw.group)).member(str(raw.target))
+            )
         else:
-            nudge.mainline = Selector().friend(str(raw.sender))
-            nudge.trigger = Selector().friend(str(raw.sender))
-            nudge.extra['target'] = Selector().friend(str(raw.target))
+            nudge.mainline = Selector().land(protocol.land.name).friend(str(raw.sender))
+            nudge.trigger = Selector().land(protocol.land.name).friend(str(raw.sender))
+            nudge.extra["target"] = Selector().land(protocol.land.name).friend(str(raw.target))
         return nudge
 
     @event("GroupNudgeEvent")
@@ -269,9 +297,62 @@ class CAIEventParser(AbstractEventParser["CAIProtocol"]):
 
         """
         nudge = ActivityTrigged(account)
-        nudge.id = Selector().activity("nudge_trigger")
-        nudge.activity = Selector().nudge(str(raw.template_id)).action(raw.action_text).suffix(raw.suffix_text)
-        nudge.mainline = Selector().group(str(raw.group_id))
-        nudge.trigger = Selector().group(str(raw.group_id)).member(str(raw.sender_id))
-        nudge.extra['target'] = Selector().group(str(raw.group_id)).member(str(raw.receiver_id))
+        nudge.id = Selector().land(protocol.land.name).activity("nudge_trigger")
+        nudge.activity = (
+            Selector()
+            .land(protocol.land.name)
+            .nudge(str(raw.template_id))
+            .action(raw.action_text)
+            .suffix(raw.suffix_text)
+        )
+        nudge.mainline = Selector().land(protocol.land.name).group(str(raw.group_id))
+        nudge.trigger = Selector().land(protocol.land.name).group(str(raw.group_id)).member(str(raw.sender_id))
+        nudge.extra["target"] = (
+            Selector().land(protocol.land.name).group(str(raw.group_id)).member(str(raw.receiver_id))
+        )
         return nudge
+
+    @event("GroupMemberJoinedEvent")
+    async def group_member_joined_event(
+            self, protocol: CAIProtocol, account: CAIAccount, raw: GroupMemberJoinedEvent
+    ):
+        mainline = Selector().land(protocol.land.name).group(str(raw.group_id))
+        return RelationshipDestroyed(
+            mainline.copy().member(str(raw.uin)),
+            account,
+        )
+
+    @event("GroupMemberLeaveEvent")
+    async def group_member_leave_event(
+        self, protocol: CAIProtocol, account: CAIAccount, raw: GroupMemberLeaveEvent
+    ):
+        mainline = Selector().land(protocol.land.name).group(str(raw.group_id))
+        return RelationshipDestroyed(
+            mainline.copy().member(str(raw.uin)),
+            account,
+            mainline.copy().member(str(raw.operator)) if raw.operator and raw.operator != raw.uin else None
+        )
+
+    @event("GroupNameChangedEvent")
+    async def group_name_changed_event(
+        self, protocol: CAIProtocol, account: CAIAccount, raw: GroupNameChangedEvent
+    ):
+        ...
+
+    @event("JoinGroupRequestEvent")
+    async def join_group_request_event(
+        self, protocol: CAIProtocol, account: CAIAccount, raw: JoinGroupRequestEvent
+    ):
+        land = Selector().land(protocol.land.name)
+        return RequestReceived(
+            Request(
+                Request,
+                f"{raw.seq}|{raw.time}|{raw.uid}",
+                protocol.land,
+                land.copy().group(str(raw.group_id)),
+                land.friend(str(raw.from_uin)) if raw.is_invited else land.stranger(str(raw.from_uin)),
+                account,
+                time := datetime.fromtimestamp(float(raw.time)),
+            ),
+            time,
+        )
