@@ -58,7 +58,10 @@ class CAIProtocol(BaseProtocol):
         import avilla.cai.impl.query as _  # noqa
 
     with wrap_artifacts() as event_parsers:
+        import avilla.cai.event.account as _  # noqa
         import avilla.cai.event.message as _  # noqa
+        import avilla.cai.event.group as _  # noqa
+        import avilla.cai.event.request as _  # noqa
 
     with wrap_artifacts() as message_parsers:
         import avilla.cai.message_parse as _  # noqa
