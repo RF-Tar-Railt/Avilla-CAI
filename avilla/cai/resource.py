@@ -1,22 +1,22 @@
 from __future__ import annotations
 
 from avilla.core.resource import Resource
-from avilla.core.utilles.selector import Selector
+from avilla.core.selector import Selector
 
 
 class CAIResource(Resource[bytes]):
     url: str | None = None
-    mainline: Selector | None = None
+    scene: Selector | None = None
 
     def __init__(
         self,
         id: str,
         url: str | None = None,
-        mainline: Selector | None = None,
+        scene: Selector | None = None,
     ) -> None:
         self.id = id
         self.url = url
-        self.mainline = mainline
+        self.scene = scene
 
     @property
     def type(self) -> str:
@@ -24,7 +24,7 @@ class CAIResource(Resource[bytes]):
 
     @property
     def selector(self) -> Selector:
-        return (self.mainline.copy() if self.mainline is not None else Selector()).appendix(self.type, self.id)
+        return (self.scene or Selector()).appendix(self.type, self.id)
 
 
 class CAIImageResource(CAIResource):
@@ -40,10 +40,10 @@ class CAIAudioResource(CAIResource):
         self,
         id: str,
         url: str | None = None,
-        mainline: Selector | None = None,
+        scene: Selector | None = None,
         length: int | None = None,
     ) -> None:
-        super().__init__(id, url, mainline)
+        super().__init__(id, url, scene)
         self.length = length
 
     @property
@@ -66,9 +66,9 @@ class CAIVideoResource(CAIResource):
             length: int | None = None,
             thumb_size: int | None = None,
             thumb_md5: bytes | None = None,
-            mainline: Selector | None = None,
+            scene: Selector | None = None,
     ) -> None:
-        super().__init__(id, mainline=mainline)
+        super().__init__(id, scene=scene)
         self.md5 = md5
         self.size = size
         self.length = length

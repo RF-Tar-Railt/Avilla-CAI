@@ -6,26 +6,25 @@ avilla 的 cai协议适配
 
 ```python
 from creart import create
+from launart import Launart
 from graia.amnesia.builtins.aiohttp import AiohttpClientService
 from graia.broadcast import Broadcast
-from avilla.core.account import AbstractAccount
-from avilla.core.application import Avilla
-from avilla.core.event.message import MessageReceived
-from avilla.core.relationship import Relationship
 
+from avilla.core import Avilla, Context, MessageReceived
 from avilla.cai.protocol import CAIProtocol
 from avilla.cai.config import CAIConfig
 
-protocol = CAIProtocol(CAIConfig("YourAccount", "YourPassword"))
 broadcast = create(Broadcast)
-avilla = Avilla(broadcast, [protocol], [AiohttpClientService()])
+launart = Launart()
+launart.add_service(AiohttpClientService())
+avilla = Avilla(broadcast, launart, [CAIProtocol(CAIConfig("YourAccount", "YourPassword"))])
 
 
 @broadcast.receiver(MessageReceived)
-async def on_message_received(event: MessageReceived, rs: Relationship, account: AbstractAccount):
-    if rs.ctx.follows("group.member(master-account)"):
-        await rs.send_message("Hello, Avilla!")
+async def on_message_received(ctx: Context, event: MessageReceived):
+    if ctx.client.follows("group.member(master-account)"):
+        await ctx.scene.send_message("Hello, Avilla!")
 
 
-avilla.launch_manager.launch_blocking(loop=broadcast.loop)
+launart.launch_blocking(loop=broadcast.loop)
 ```

@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from cai import Client
 from avilla.core.account import AbstractAccount
-from avilla.core.relationship import Relationship
-from avilla.core.utilles.selector import Selector
+from avilla.core.context import Context
+from avilla.core.selector import Selector
 
 if TYPE_CHECKING:
     from .protocol import CAIProtocol
@@ -13,21 +13,21 @@ if TYPE_CHECKING:
 class CAIAccount(AbstractAccount):
     protocol: CAIProtocol
 
-    async def get_relationship(self, target: Selector, *, via: Selector | None = None) -> Relationship:
+    async def get_context(self, target: Selector, *, via: Selector | None = None) -> Context:
         # TODO: 对象存在性检查
         if "land" not in target:
-            target = Selector().mixin(f"land.{target.path}", target)
+            target = target.land(self.protocol.land)
         if target.path == "land.group":
-            return Relationship(self.protocol, target, target, target.copy().member(self.id), self)
+            return Context(self, target, target, target.member(self.id), self.to_selector())
         elif target.path == "land.friend":
-            return Relationship(self.protocol, target, target, self.to_selector(), self)
+            return Context(self, target, target, self.to_selector(), self.to_selector())
         elif target.path == "land.group.member":
-            return Relationship(
-                self.protocol,
+            return Context(
+                self,
                 target,
                 Selector().land(self.land.name).group(target.pattern["group"]),
                 Selector().land(self.land.name).group(target.pattern["group"]).member(self.id),
-                self,
+                self.to_selector(),
             )
         else:
             raise NotImplementedError()
@@ -41,7 +41,7 @@ class CAIAccount(AbstractAccount):
         return self.client.connected
 
     async def call(self, endpoint: str, params: dict[str, Any] | None = None) -> Any:
-        ...
+        return await (getattr(self.client, endpoint)(**(params or {})))
         # params = params or {}
         # method: CallMethod = params.pop("__method__")
         # if params.pop("__use_session__", True):

@@ -2,7 +2,10 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Set, Literal, List
 from launart import Launart, Service
+from graia.amnesia.transport.common.client import AbstractClientInterface
+from graia.amnesia.builtins.memcache import MemcacheService
 from avilla.cai.client import CAIClient
+from avilla.cai.config import CAIConfig
 
 if TYPE_CHECKING:
     from .protocol import CAIProtocol
@@ -14,6 +17,11 @@ class CAIService(Service):
 
     protocol: CAIProtocol
     clients: List[CAIClient]
+
+    @classmethod
+    def loads(cls, *config: CAIConfig):
+        from .protocol import CAIProtocol
+        return cls(CAIProtocol(*config))
 
     def __init__(self, protocol: CAIProtocol):
         self.protocol = protocol
@@ -35,8 +43,8 @@ class CAIService(Service):
         return None
 
     @property
-    def required(self) -> Set[str]:
-        return {"http.client/aiohttp"}
+    def required(self):
+        return {MemcacheService, AbstractClientInterface}
 
     @property
     def stages(self) -> Set[Literal["preparing", "blocking", "cleanup"]]:

@@ -1,121 +1,98 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import timedelta
-from typing import TYPE_CHECKING
-from graia.amnesia.message import MessageChain
+from datetime import timedelta, datetime
+from typing import TYPE_CHECKING 
 from cai.client.models import Group, GroupMember
-
-from avilla.core.cell.cells import Nick, Privilege, Summary
-from avilla.core.exceptions import permission_error_message
-from avilla.core.skeleton.message import MessageRevoke, MessageSend
-from avilla.core.skeleton.privilege import MuteTrait, PrivilegeTrait, MuteAllTrait
-from avilla.core.skeleton.scene import SceneTrait
-from avilla.core.skeleton.summary import SummaryTrait
-from avilla.core.trait.context import prefix, raise_for_no_namespace, scope
-from avilla.core.trait.recorder import default_target, impl, pull, query
-from avilla.core.utilles.selector import Selector
+from graia.amnesia.builtins.memcache import Memcache
+from avilla.core.message import Message
+from avilla.core.metadata import MetadataOf
+from avilla.core.selector import Selector
+from avilla.core.trait.context import bounds, implement, pull
+from avilla.spec.core.message import MessageSend
+from avilla.spec.core.privilege import MuteAllTrait, Privilege, MuteTrait
+from avilla.spec.core.profile import Summary, SummaryTrait
+from avilla.spec.core.scene import SceneTrait
 
 from avilla.cai.account import CAIAccount
 
 if TYPE_CHECKING:
-    from avilla.core.relationship import Relationship
+    from graia.amnesia.message import __message_chain_class__
+    from avilla.core.context import Context
+    from ..protocol import CAIProtocol
 
-raise_for_no_namespace()
+with bounds("group"):
 
-with scope("avilla-cai", "group"), prefix("group"):
-    @default_target(MessageSend.send)
-    def send_group_message_default_target(rs: Relationship):
-        return rs.mainline
-
-
-    @impl(MessageSend.send)
+    @implement(MessageSend.send)
     async def send_group_message(
-            rs: Relationship, target: Selector, message: MessageChain, *, reply: Selector | None = None
+            ctx: Context, target: Selector, message: __message_chain_class__, *, reply: Selector | None = None
     ) -> Selector:
-        serialized_msg = await rs.protocol.serialize_message(message)
-        assert isinstance(rs.account, CAIAccount)
-        result = await rs.account.client.send_group_msg(
+        if TYPE_CHECKING:
+            assert isinstance(ctx.protocol, CAIProtocol)
+        assert isinstance(ctx.account, CAIAccount)
+        serialized_msg = await ctx.protocol.serialize_message(message, ctx, reply=reply)
+        result = await ctx.account.client.send_group_msg(
             int(target.pattern["group"]),
             serialized_msg
         )
-        return Selector().land(rs.land).group(target.pattern["group"]).message(str(result[0])).random(
-            str(result[1])).time(str(result[2]))
-
-
-    @impl(MessageRevoke.revoke)
-    async def revoke_group_message(rs: Relationship, message: Selector):
-        assert isinstance(rs.account, CAIAccount)
-        await rs.account.client.recall_group_msg(
-            int(message.pattern["group"]),
-            (
-                int(message.pattern["message"]),
-                int(message.pattern["random"]),
-                int(message.pattern["time"])
-            )
+        message_metadata = Message(
+            describe=Message,
+            id=str(result[0]),
+            scene=Selector().land(ctx.land).group(str(target.pattern["group"])),
+            content=message,
+            time=datetime.now(),
+            sender=Selector().land(ctx.land).group(str(target.pattern["group"])).member(ctx.account.id),
         )
+        message_selector = message_metadata.to_selector().random(str(result[1])).time(str(result[2]))
+        ctx._collect_metadatas(message_selector, message_metadata)
+        memcache = ctx.avilla.launch_manager.get_interface(Memcache)
+        memcache.set(f"_cai_context.message.{message_metadata.id}", message, timedelta(seconds=300))
+        return message_selector
 
 
-    @impl(MuteTrait.mute)
-    async def mute_member(rs: Relationship, target: Selector, duration: timedelta):
-        privilege_info = await rs.pull(Privilege, target)
-        if not privilege_info.effective:
-            self_privilege_info = await rs.pull(Privilege >> Summary, rs.self)
-            raise PermissionError(
-                permission_error_message(
-                    f"Mute.mute@{target.path}", self_privilege_info.name, ["group_owner", "group_admin"]
-                )
-            )
-        time = max(0, min(int(duration.total_seconds()), 2592000))  # Fix time parameter
-        if not time:
-            return
-        assert isinstance(rs.account, CAIAccount)
-        await rs.account.client.mute_member(
-            int(target.pattern["group"]),
-            int(target.pattern["member"]),
-            time
-        )
-
-
-    @impl(MuteTrait.unmute)
-    async def unmute_member(rs: Relationship, target: Selector):
+    @implement(MuteAllTrait.mute_all)
+    async def group_mute_all(ctx: Context, target: Selector):
+        assert isinstance(ctx.account, CAIAccount)
         raise NotImplementedError
 
 
-    @impl(MuteAllTrait.mute_all)
-    async def group_mute_all(rs: Relationship, target: Selector):
+    @implement(MuteAllTrait.unmute_all)
+    async def group_unmute_all(ctx: Context, target: Selector):
+        assert isinstance(ctx.account, CAIAccount)
         raise NotImplementedError
 
 
-    @impl(MuteAllTrait.unmute_all)
-    async def group_unmute_all(rs: Relationship, target: Selector):
+    @implement(SceneTrait.leave)
+    async def leave(ctx: Context, target: Selector):
+        assert isinstance(ctx.account, CAIAccount)
         raise NotImplementedError
 
 
-    @impl(SceneTrait.leave).pin("group")
-    async def leave(rs: Relationship, target: Selector):
+    @implement(SceneTrait.remove_member)
+    async def remove_member(ctx: Context, target: Selector, reason: str | None = None):
+        assert isinstance(ctx.account, CAIAccount)
         raise NotImplementedError
 
 
-    @impl(SceneTrait.remove_member)
-    async def remove_member(rs: Relationship, target: Selector, reason: str | None = None):
-        raise NotImplementedError
-
-
-    @pull(Summary).of("group")
-    async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
+    @pull(Summary)
+    async def get_summary(ctx: Context, target: Selector | None) -> Summary:
         assert target is not None
-        assert isinstance(rs.account, CAIAccount)
-        group = await rs.account.client.get_group(int(target.pattern["group"]))
+        assert isinstance(ctx.account, CAIAccount)
+        group = await ctx.account.client.get_group(int(target.pattern["group"]))
         assert isinstance(group, Group)
         return Summary(describe=Summary, name=group.group_name, description=group.group_memo)
 
-    @pull(Summary).of("group.member")
-    async def get_summary(rs: Relationship, target: Selector | None) -> Summary:
-        assert isinstance(rs.account, CAIAccount)
-        result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
+    @implement(SummaryTrait.set_name)
+    async def group_set_name(ctx: Context, target: Selector, name: str):
+        assert isinstance(ctx.account, CAIAccount)
+        raise NotImplementedError
+
+    @pull(Summary)
+    async def get_summary(ctx: Context, target: Selector | None) -> Summary:
+        assert isinstance(ctx.account, CAIAccount)
+        result: list[GroupMember] = await ctx.account.client.get_group_member_list(int(ctx.self.pattern["group"]))
         try:
-            self = next(filter(lambda x: x.uin == int(rs.account.id), result))
+            self = next(filter(lambda x: x.uin == int(ctx.self.pattern["member"]), result))
         except StopIteration as e:
             raise RuntimeError from e
         if not target:
@@ -134,20 +111,15 @@ with scope("avilla-cai", "group"), prefix("group"):
                 member.memo
             )
 
-    @impl(SummaryTrait.set_name).pin("group")
-    async def group_set_name(rs: Relationship, target: Selector, name: str):
-        raise NotImplementedError
-
-
-    @pull(Privilege).of("group.member")
-    async def group_get_privilege_info(rs: Relationship, target: Selector | None) -> Privilege:
-        assert isinstance(rs.account, CAIAccount)
-        result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
+    @pull(Privilege)
+    async def group_get_privilege_info(ctx: Context, target: Selector | None) -> Privilege:
+        assert isinstance(ctx.account, CAIAccount)
+        result: list[GroupMember] = await ctx.account.client.get_group_member_list(int(ctx.self.pattern["group"]))
         try:
-            self = next(filter(lambda x: x.uin == int(rs.account.id), result))
+            self = next(filter(lambda x: x.uin == int(ctx.account.id), result))
         except StopIteration as e:
             raise RuntimeError from e
-        if not target:
+        if target is None:
             return Privilege(
                 Privilege,
                 self.role.value in {"owner", "admin"},
@@ -168,79 +140,17 @@ with scope("avilla-cai", "group"), prefix("group"):
         )
 
 
-    @pull(Privilege >> Summary).of("group.member")
-    async def group_get_privilege_summary_info(rs: Relationship, target: Selector | None) -> Summary:
-        assert isinstance(rs.account, CAIAccount)
-        privilege_trans = defaultdict(lambda: "group_member", {"owner": "group_owner", "admin": "group_admin"})
-        result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
-        try:
-            self = next(filter(lambda x: x.uin == int(rs.account.id), result))
-        except StopIteration as e:
-            raise RuntimeError from e
-        if not target:
-            return Summary(
-                Privilege >> Summary,
-                privilege_trans[self.role.value],
-                "the permission info of current account in the group",
-            )
-        try:
-            member = next(filter(lambda x: x.uin == int(target.pattern["member"]), result))
-        except StopIteration as e:
-            raise RuntimeError from e
-        return Summary(
-            Privilege >> Summary,
-            privilege_trans[member.role.value],
-            "the permission info of current account in the group",
-        )
+    #
+    # @pull(Nick).of("group.member")
+    # async def get_member_nick(ctx: Context, target: Selector | None) -> Nick:
+    #     assert target is not None
+    #     assert isinstance(ctx.account, CAIAccount)
+    #     result: list[GroupMember] = await ctx.account.client.get_group_member_list(int(target.pattern["group"]))
+    #     try:
+    #         member = next(filter(lambda x: x.uin == int(target.pattern["member"]), result))
+    #     except StopIteration as e:
+    #         raise RuntimeError from e
+    #     return Nick(Nick, member.name or member.nick, member.member_card, member.special_title)
+    #
 
 
-    @impl(PrivilegeTrait.upgrade).pin("group.member")
-    async def group_set_admin(rs: Relationship, target: Selector, dest: str | None):
-        assert isinstance(rs.account, CAIAccount)
-        await rs.account.client.set_group_admin(
-            int(target.pattern['group']),
-            int(target.pattern['member']),
-            is_admin=True
-        )
-
-
-    @impl(PrivilegeTrait.downgrade).pin("group.member")
-    async def group_set_admin(rs: Relationship, target: Selector, dest: str | None):
-        assert isinstance(rs.account, CAIAccount)
-        await rs.account.client.set_group_admin(
-            int(target.pattern['group']),
-            int(target.pattern['member']),
-            is_admin=False
-        )
-
-
-    @pull(Nick).of("group.member")
-    async def get_member_nick(rs: Relationship, target: Selector | None) -> Nick:
-        assert target is not None
-        assert isinstance(rs.account, CAIAccount)
-        result: list[GroupMember] = await rs.account.client.get_group_member_list(int(target.pattern["group"]))
-        try:
-            member = next(filter(lambda x: x.uin == int(target.pattern["member"]), result))
-        except StopIteration as e:
-            raise RuntimeError from e
-        return Nick(Nick, member.name or member.nick, member.member_card, member.special_title)
-
-
-    @query(None, "group")
-    async def get_groups(rs: Relationship, upper: None, predicate: Selector):
-        assert isinstance(rs.account, CAIAccount)
-        result: list[Group] = await rs.account.client.get_group_list()
-        for i in result:
-            group = Selector().group(str(i.group_id))
-            if predicate.match(group):
-                yield group
-
-
-    @query("group", "member")
-    async def get_group_members(rs: Relationship, upper: Selector, predicate: Selector):
-        assert isinstance(rs.account, CAIAccount)
-        result: list[GroupMember] = await rs.account.client.get_group_member_list(int(upper.pattern["group"]))
-        for i in result:
-            member = Selector().group(str(i.group.group_id)).member(str(i.member_uin))
-            if predicate.match(member):
-                yield member

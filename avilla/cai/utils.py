@@ -6,10 +6,10 @@ from loguru import logger
 
 
 async def wait_fut(
-        coros: Iterable[Union[Coroutine, asyncio.Task]],
-        *,
-        timeout: Optional[float] = None,
-        return_when: str = asyncio.ALL_COMPLETED,
+    coros: Iterable[Union[Coroutine, asyncio.Task]],
+    *,
+    timeout: Optional[float] = None,
+    return_when: str = asyncio.ALL_COMPLETED,
 ) -> None:
     tasks = []
     for c in coros:
@@ -80,7 +80,7 @@ async def _login_device_locked(client: Client, exc: LoginDeviceLocked):
                 f"{'[green]| enable  | [/]' if exc.verify_url else '[red]| disable | [/]'}"
                 f"2. Verify device by url.\n"
                 f"[yellow]Choose: [/]"
-            )
+            ),
         )
         choice = input()
         if "1" in choice and exc.sms_phone:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from typing import TYPE_CHECKING
 from cai import Client
 from cai.client.events import Event
@@ -7,9 +8,9 @@ from launart import Launchable, Launart
 from contextlib import suppress
 from loguru import logger
 from avilla.core.event import AvillaEvent
-from avilla.core.event.message import MessageReceived
-from avilla.core.event.lifecycle import AccountStatusChanged
-from avilla.core.cell.cells import Summary
+from avilla.spec.core.message import MessageReceived
+from avilla.spec.core.application import AccountStatusChanged
+from avilla.spec.core.profile import Summary
 
 from .config import CAIConfig
 from .utils import login_resolver
@@ -57,46 +58,48 @@ class CAIClient(Launchable):
 
     async def record_event(self, event: AvillaEvent):
         if isinstance(event, MessageReceived):
-            rs = await self.account.get_relationship(event.ctx)
+            _mr: MessageReceived = event
+            ctx = _mr.context
+            sender = _mr.message.sender
             if (
-                event.ctx.pattern[event.ctx.latest_key] == self.account.id
-                and event.ctx.pattern.get("land") == self.account.land.name
+                sender.last_value == self.account.id
+                and sender['land'] == self.account.land.name
             ):
                 name: str = ""
                 with suppress(NotImplementedError):
-                    name = (await rs.pull(Summary, event.message.mainline)).name
-                mainline = event.message.mainline.pattern[event.message.mainline.latest_key]
+                    name = (await ctx.pull(Summary, _mr.message.scene)).name
+                scene_id = _mr.message.scene.last_value
                 logger.info(
                     f"{self.account.land.name}: [send]"
-                    f"[{event.message.mainline.latest_key.title()}({f'{name}, ' if name else ''}{mainline})]"
-                    f" <- {str(event.message.content)!r}"
+                    f"[{_mr.message.scene.last_key.title()}({f'{name}, ' if name else ''}{scene_id})]"
+                    f" <- {str(_mr.message.content)!r}"
                 )
             else:
                 main_name: str = ""
                 with suppress(NotImplementedError):
-                    main_name = (await rs.pull(Summary, event.message.mainline)).name
-                mainline = event.message.mainline.pattern[event.message.mainline.latest_key]
-                ctx_name: str = ""
+                    main_name = (await ctx.pull(Summary, _mr.message.scene)).name
+                scene_id = _mr.message.scene.last_value
+                sender_name: str = ""
                 with suppress(NotImplementedError):
-                    ctx_name = (await rs.pull(Summary, event.message.sender)).name
-                ctx = event.ctx.pattern[event.ctx.latest_key]
-                out = f"[{event.message.mainline.latest_key.title()}({f'{main_name}, ' if main_name else ''}{mainline})]"
-                if ctx != mainline:
-                    out += f" {ctx_name or event.ctx.latest_key.title()}({ctx})"
+                    sender_name = (await ctx.pull(Summary, sender)).name
+                sender_id = sender.last_value
+                out = f"[{_mr.message.scene.last_key.title()}({f'{main_name}, ' if main_name else ''}{scene_id})]"
+                if sender_id != scene_id:
+                    out += f" {sender_name or sender.last_key.title()}({sender_id})"
 
                 logger.info(
                     f"{self.account.land.name}: [recv]{out}"
-                    f" -> {str(event.message.content)!r}"
+                    f" -> {str(_mr.message.content)!r}"
                 )
         elif not isinstance(event, AccountStatusChanged):
             logger.info(
                 f"{self.account.land.name}: {event.__class__.__name__} from "
-                f"{'.'.join(f'{k}({v})' for k, v in event.ctx.pattern.items() if k != 'land')}"
+                f"{'.'.join(f'{k}({v})' for k, v in event.context.self.pattern.items() if k != 'land')}"
             )
 
     async def _cai_event_hook(self, _: Client, event: Event):
-        parsed_event = await self.protocol.event_parser.parse_event(
-            self.protocol, self.account, event
+        parsed_event, _ctx = await self.protocol.parse_event(
+            self.account, event
         )
         if parsed_event:
             await self.record_event(parsed_event)
@@ -109,19 +112,25 @@ class CAIClient(Launchable):
                 alt=f"waiting for [magenta]{self.config.account}[/] login...",
             )
             try:
-                if self.config.cache_siginfo and self.config.cache_path.exists():
-                    logger.debug(f"using account {self.config.account}'s siginfo")
-                    await self.client.token_login(self.config.cache_path.open("rb").read())
-                else:
-                    await self.client.login()
+                try:
+                    if self.config.cache_siginfo and self.config.cache_path.exists():
+                        logger.debug(f"using account {self.config.account}'s siginfo")
+                        await self.client.token_login(self.config.cache_path.open("rb").read())
+                    else:
+                        await self.client.login()
+                except Exception as e:
+                    await login_resolver(self.client, e)
+                self.register()
             except Exception as e:
-                await login_resolver(self.client, e)
-            self.register()
+                logger.warning(e)
+                manager.status.exiting = True
+                traceback.print_exc()
         async with self.stage("cleanup"):
-            await self.client.session.close()
-            if self.config.cache_siginfo:
-                data = self.client.dump_sig()
-                self.config.cache_path.parent.mkdir(parents=True, exist_ok=True)
-                with self.config.cache_path.open("wb+") as f:
-                    f.write(data)
-                logger.success(f"account {self.config.account}'s siginfo saved.")
+            if self.client.connected:
+                await self.client.session.close()
+                if self.config.cache_siginfo:
+                    data = self.client.dump_sig()
+                    self.config.cache_path.parent.mkdir(parents=True, exist_ok=True)
+                    with self.config.cache_path.open("wb+") as f:
+                        f.write(data)
+                    logger.success(f"account {self.config.account}'s siginfo saved.")
